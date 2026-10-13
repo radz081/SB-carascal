@@ -1,0 +1,84 @@
+<div class="container">
+	<div class="card shadow-lg border-0 rounded-4 mx-auto" style="max-width: 600px;">
+	  <div class="card-body p-5">
+		<h4 class="text-center mb-4 fw-bold text-primary">User Account Settings</h4>
+  
+		<form id="form_user">
+		  <input type="hidden" name="h_user" id="login_id" value="0">
+  
+		  <!-- Message Area -->
+		  <p id="msg_user" class="text-danger text-center fw-semibold"></p>
+  
+		  <!-- Old Password Section -->
+		  <div id="user_create_or_not" class="mb-3">
+			<label for="inp_old_pass" class="form-label fw-semibold">Enter Old Password</label>
+			<input type="password"
+				   class="form-control"
+				   id="inp_old_pass"
+				   name="old_pass"
+				   required
+				   autocomplete="new-password"
+				   onkeyup="clearAll('msg_user')"
+				   placeholder="Enter current password">
+		  </div>
+  
+		  <!-- New Username -->
+		  <div class="mb-3">
+			<label for="new_username" class="form-label fw-semibold">New Username</label>
+			<input type="text"
+				   id="new_username"
+				   name="new_username"
+				   autocomplete="new-password"
+				   class="form-control"
+				   placeholder="Enter new username">
+		  </div>
+  
+		  <!-- New Password -->
+		  <div class="mb-3">
+			<label for="new_pass" class="form-label fw-semibold">Enter New Password</label>
+			<input type="password"
+				   id="new_pass"
+				   name="new_pass"
+				   class="form-control"
+				   required
+				   onkeyup="clearAll('msg_user')"
+				   placeholder="Enter new password">
+		  </div>
+  
+		  <!-- Confirm Password -->
+		  <div class="mb-3">
+			<label for="confirm_pass" class="form-label fw-semibold">Confirm New Password</label>
+			<input type="password"
+				   id="confirm_pass"
+				   name="confirm_pass"
+				   class="form-control"
+				   required
+				   onkeyup="clearAll('msg_user')"
+				   placeholder="Confirm new password">
+		  </div>
+  
+		  <!-- Full Name -->
+		  <div class="mb-4">
+			<label for="fullname" class="form-label fw-semibold">Full Name</label>
+			<input type="text"
+				   id="fullname"
+				   name="fullname"
+				   class="form-control"
+				   required
+				   onkeyup="clearAll('msg_user')"
+				   placeholder="Enter full name">
+		  </div>
+  
+		  <!-- Action Buttons -->
+		  <div class="text-center mt-4">
+			<button type="submit" class="btn btn-success px-4 me-2">
+			  <i class="bi bi-check-circle"></i> Submit
+			</button>
+			<button type="button" class="btn btn-danger px-4" onclick="delete_user()">
+			  <i class="bi bi-trash"></i> Delete
+			</button>
+		  </div>
+		</form>
+	  </div>
+	</div>
+  </div>

@@ -1,0 +1,1084 @@
+<div class="col-sm-12">
+    <div class="card">
+        <div class="card-header d-flex justify-content-between">
+           <div class="header-title">
+                <h4 class="card-title">Sessions</h4>
+           </div>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table id="tbl_session" class="table table-striped" style="table-layout:fixed;" data-toggle="data-table" width="99.8%">
+                    <colgroup>
+                        <col style="width:6px">
+                        <col style="width:10px">
+                        <col style="width:5px">
+                        <col style="width:10px">
+                        <col style="width:5px">
+                        <col style="width:5px">
+                    </colgroup>
+                    <thead>
+                        <tr>
+                            <th>Session</th>
+                            <th>Type</th>
+                            <th>Date</th>
+                            <th id="type_tbl"></th>
+                            <th>FROM-TO</th>
+                            <th>ACTION</th>
+                        </tr>
+                    </thead>
+                </table>
+            </div>
+       </div>
+    </div>
+</div>
+
+<script type="text/javascript">
+    function open_session(elem){
+        var tr = $(elem).closest('tr');
+        let dataArr = $('#tbl_session').DataTable().row( tr ).data();
+
+        if(dataArr){
+            getbyId('btn_del_session').style.display = "inline-block";
+            sendDataWithCallback("/get_session_data",{session_id:dataArr.session_id}, function(res){
+                if (res) {
+                    const form = getbyId('form_session2')
+                    form.session_id.value = dataArr.session_id;
+                    form.sp_number.value =res.sess_data[0].sp_number;
+                    form.sp_type.value =res.sess_data[0].session_type;
+                    form.closing_prayer_lead.value = res.sess_data[0].closing_prayer
+                    form.session_date.value = res.sess_data[0].session_date
+                    form.session_number.value = res.sess_data[0].session_number
+                    populateSession(res)
+                }
+
+                $("#div_session_add").modal("toggle");
+            })
+        }
+    }
+
+    function order_of_business(elem){
+        var tr = $(elem).closest('tr');
+        let dataArr = $('#tbl_session').DataTable().row( tr ).data();
+
+        fetch('/get_OOB', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                session_id: dataArr.session_id
+            }),
+        })
+        .then(response => response.json())
+        .then(res => {
+            if (res) {
+                if (res.sess_data.length!=0) {
+
+                    var x = res.sess_data[0].session_number.replace(/\D/g,'');
+                    var number = ordinal_suffix_of(x);
+
+                    var ses_date = moment(res.sess_data[0].session_date).format('LL')
+
+                    getbyId('li_reading_minutes').innerHTML = ""
+                    getbyId('li_question_hour').innerHTML = ""
+                    getbyId('li_priveledge_hour').innerHTML = ""
+                    getbyId('session_petition_req_ref').innerHTML = ""
+                    getbyId('li_refferals_communication').innerHTML = ""
+                    getbyId('session_proposed_ordinance').innerHTML = ""
+                    getbyId('session_proposed_resolution').innerHTML = ""
+                    getbyId('session_committee_report_').innerHTML = ""
+                    getbyId('session_business_day').innerHTML = ""
+
+                    byId("session_oob_id").value = res.sess_data[0].session_id;
+                    byId('attendance_session_id').value = res.sess_data[0].session_id;
+                    byId("sp_number_h").value = res.sess_data[0].sp_number;
+                    byId('sangunian_session_date').innerHTML = ses_date;
+
+                    byId("div_code_1").innerHTML="";
+                    byId("div_ref_1").innerHTML="";
+
+                    const sessionNumber = res.sess_data[0].session_number; // e.g. "17th"
+                    const sessionType = res.sess_data[0].session_type;
+
+                    const match = sessionNumber.match(/^(\d+)([a-zA-Z]+)$/);
+
+                    if (match) {
+                        const num = match[1];
+                        const suffix = match[2];
+                        document.getElementById("no_of_session").innerHTML = `${num}<sup>${suffix}</sup> ${sessionType} SESSION`;
+                    } else {
+                        document.getElementById("no_of_session").innerHTML = 
+                        `${sessionNumber} ${sessionType} SESSION`;
+                    }
+
+                    sendDataWithCallback('/get_session_video',{session_id:res.sess_data[0].session_id},(res)=>{
+                        if(res.length){
+                            if(res[0]['intro_path']!='None'){
+                                getbyId('intro2').href = '/static/' + res[0].intro_path;
+                            }
+
+                            if(res[0]['national_anthem_path']!='None'){
+                                getbyId('pambansang_awit').href = '/static/' + res[0].national_anthem_path;
+                            }
+
+                            if(res[0]['prayer_path']!='None'){
+                                getbyId('opening_prayer_2').href = '/static/' + res[0].prayer_path;
+                                
+                            }
+                        }
+                        
+                    })
+
+                    // attendance
+                    if (res.sess_roll_call) {
+                        if (res.sess_roll_call.length!=0) {
+                            var parent = byId("session_roll_call");
+                            parent.innerHTML = ""
+                            res.sess_roll_call.forEach(function(item,index){
+                                var child = createElem("div"),
+                                    div1 = createElem("div"),
+                                    inp = createElem("select"),
+                                    inp2 = createElem('input'),
+                                    div2 = createElem("div"),
+                                    p = createElem("p"),
+                                    opt1 = createElem('option'),
+                                    opt2 = createElem('option'),
+                                    opt3 = createElem('option'),
+                                    opt4 = createElem('option');
+
+                                child.style = "width:100%!important; display: table !important;";
+                                div1.style = "width:40%!important;float:left!important;margin-top:1%";              
+
+                                inp.className = "form-control";
+                                inp.name = "attendance["+index+"][roll_call]";
+                                inp.setAttribute('disabled',true)
+                                
+                                inp.value = item.status
+                                if (item.status == 0) {
+                                    opt1.setAttribute("selected",true);
+                                }else if (item.status == 1) {
+                                    opt2.setAttribute("selected",true);
+                                }else if (item.status == 2) {
+                                    opt3.setAttribute("selected",true);
+                                }else if (item.status == 3) {
+                                    opt4.setAttribute("selected",true);
+                                }
+
+                                inp.style = "margin:0;width:50%;margin-right:70%";
+                                inp2.value = item.roll_call_id;
+                                inp2.name = "attendance["+index+"][roll_call_id]";
+                                inp2.type = "hidden"
+                                
+                                div2.style = "width:60%!important;float:right!important;margin-top:1%";
+                                p.className = "textStyle";
+                                p.style = "font-size: 15px;margin-left:10%;";
+                                p.innerHTML = item.fullname;
+
+                                opt1.innerHTML = "PRESENT";
+                                opt2.innerHTML = "ABSENT";
+                                opt3.innerHTML = "LEAVE";
+                                opt4.innerHTML = "TRAVEL";
+                                opt1.value = "0";
+                                opt2.value = "1";
+                                opt3.value = "2";
+                                opt3.value = "3";
+
+
+                                inp.appendChild(opt1)
+                                inp.appendChild(opt2)
+                                inp.appendChild(opt3)
+                                inp.appendChild(opt4)
+
+                                div1.appendChild(p);
+                                div2.appendChild(inp2)
+                                div2.appendChild(inp);
+                                child.appendChild(div1);
+                                child.appendChild(div2);
+                                parent.appendChild(child)
+                            });
+                        }
+                    }
+
+                    // reading and approval of minutes
+                    if (res.sess_priv_min) {
+                        if (res.sess_priv_min.length!=0) {
+                            const ol = getbyId('li_reading_minutes')
+                            ol.innerHTML = ""
+                            res.sess_priv_min.forEach(function(item,index){
+                                let li = document.createElement("li");
+                                li.setAttribute("style", "color: black; font-weight: normal;");
+
+                                const filePath = `/static/uploads/${item.document_file}`;
+                                const fileIsDocx = filePath.toLowerCase().endsWith('.docx');
+
+                                const link = document.createElement("a");
+                                link.textContent = "View Document";
+                                link.setAttribute("style", "color: blue; text-decoration: underline;");
+
+                                if (fileIsDocx) {
+                                    link.setAttribute("href", "#");
+                                    link.onclick = function() {
+                                        openWordFile(filePath);
+                                        return false;
+                                    };
+                                } else {
+                                    link.setAttribute("href", filePath);
+                                    link.setAttribute("target", "_blank");
+                                }
+
+                                li.textContent = item.title + " ";
+                                li.appendChild(link);
+
+                                ol.appendChild(li);
+                            })
+                        }
+                    }
+
+                    // question privilge
+                    if (res.sess_question) {
+                        if (res.sess_question.length!=0) {
+
+                            const ol = getbyId('li_question_hour')
+                            ol.innerHTML = ""
+                            res.sess_question.forEach(function(item,index){
+                                let li = document.createElement("li");
+                                li.setAttribute("style", "color: black; font-weight: normal;");
+
+                                li.textContent = item.fullname + "; " + item.subject + " ";
+                                if(item.file){
+                                    const fileArray = item.file.split(',').map(f => f.trim());
+                                    fileArray.forEach((file, fileIndex) => {
+                                        const filePath = `/static/${file.replace(/\\/g, '/')}`; 
+                                        const fileIsDocx = filePath.toLowerCase().endsWith('.docx');
+    
+                                        const link = document.createElement('a');
+                                        link.textContent = fileArray.length === 1 ? 'View file' : `View file ${fileIndex + 1}`;
+                                        link.setAttribute('style', 'color: blue; text-decoration: underline; margin-left: 5px;');
+    
+                                        if (fileIsDocx) {
+                                            link.setAttribute('href', '#');
+                                            link.onclick = function () {
+                                                openWordFile(filePath);
+                                                return false;
+                                            };
+                                        } else {
+                                            link.setAttribute('href', filePath);
+                                            link.setAttribute('target', '_blank');
+                                        }
+    
+                                        li.appendChild(link);
+    
+                                        if (fileIndex < fileArray.length - 1) {
+                                            li.appendChild(document.createTextNode(', '));
+                                        }
+                                    });
+                                }
+
+                                ol.appendChild(li);
+
+                            })
+                            
+                        }
+                    }
+
+                    // privilge hour
+                    if (res.sess_priv_hour) {
+                        if (res.sess_priv_hour.length!=0) {
+                            const ol = getbyId('li_priveledge_hour')
+                            ol.innerHTML = ""
+                            
+                            res.sess_priv_hour.forEach(function(item,index){
+                                let li = document.createElement("li");
+                                li.setAttribute("style", "color: black; font-weight: normal;");
+
+                                li.innerHTML = item.councilor + " ";
+                                if(item.file){
+                                    const fileArray = item.file.split(',').map(f => f.trim());
+    
+                                    fileArray.forEach((file, fileIndex) => {
+                                        const filePath = `/static/${file.replace(/\\/g, '/')}`; // convert backslashes to forward slashes
+                                        const fileIsDocx = filePath.toLowerCase().endsWith('.docx');
+    
+                                        const link = document.createElement('a');
+                                        link.textContent = fileArray.length === 1 ? 'View file' : `View file ${fileIndex + 1}`;
+                                        link.setAttribute('style', 'color: blue; text-decoration: underline; margin-left: 5px;');
+    
+                                        if (fileIsDocx) {
+                                            link.setAttribute('href', '#');
+                                            link.onclick = function () {
+                                                openWordFile(filePath);
+                                                return false;
+                                            };
+                                        } else {
+                                            link.setAttribute('href', filePath);
+                                            link.setAttribute('target', '_blank');
+                                        }
+    
+                                        li.appendChild(link);
+    
+                                        if (fileIndex < fileArray.length - 1) {
+                                            li.appendChild(document.createTextNode(', '));
+                                        }
+                                    });
+                                }
+
+                                ol.appendChild(li);
+                            })
+                        }
+                    }
+                 
+                    
+                    // additional refferals
+                    if (res.sess_reading_pet && res.sess_reading_pet.length !== 0) {
+                        const ol = getbyId('session_petition_req_ref');
+                        ol.innerHTML = ""; 
+                        ol.style.listStyleType = 'lower-alpha'; 
+
+                        res.sess_reading_pet.forEach(function(item, index) {
+                            const li = document.createElement('li'); 
+                            li.style = "color: black; font-weight: normal;margin-left: 20px;";
+                            li.textContent = item.tracking_no;
+
+                            const docUl = document.createElement('ul');
+                            docUl.style = "list-style-type: disc; margin-left: 10px;font-size:18px";
+
+                            if (item.document_file) {
+                                const fileArray = item.document_file.split(',').map(f => f.trim());
+
+                                fileArray.forEach((file, fileIndex) => {
+                                    const filePath = `/static/uploads/${file.replace(/\\/g, '/')}`;
+                                    const fileLi = document.createElement('li');
+                                    const link = document.createElement('a');
+
+                                    link.textContent = fileArray.length === 1 ? 'View Document' : `View Document ${fileIndex + 1}`;
+                                    link.style = "color: blue; text-decoration: underline;";
+
+                                    if (filePath.toLowerCase().endsWith('.docx')) {
+                                        link.href = '#';
+                                        link.onclick = function() { openWordFile(filePath); return false; };
+                                    } else {
+                                        link.href = filePath;
+                                        link.target = '_blank';
+                                    }
+
+                                    fileLi.innerHTML = `${item.title}`;
+                                    fileLi.appendChild(link);
+                                    docUl.appendChild(fileLi);
+                                });
+                            }else{
+                                const fileLi = document.createElement('li');
+                                fileLi.innerHTML = `${item.title}`;
+                                docUl.appendChild(fileLi);
+                            }
+
+                            li.appendChild(docUl);
+                            ol.appendChild(li); // append <li> directly to parent <ol>
+                        });
+                    }
+
+                    // additional refferals
+                    if (res.sess_reading_additional_ref && res.sess_reading_additional_ref.length !== 0) {
+                        const ol = getbyId('li_refferals_communication');
+                        ol.innerHTML = ""; 
+                        ol.style.listStyleType = 'lower-alpha'; 
+
+                        res.sess_reading_additional_ref.forEach(function(item, index) {
+                            const li = document.createElement('li'); 
+                            li.style = "color: black; font-weight: normal;margin-left: 20px;";
+                            li.textContent = item.tracking_no;
+
+                            const docUl = document.createElement('ul');
+                            docUl.style = "list-style-type: disc; margin-left: 10px;font-size:18px";
+
+                            if (item.document_file) {
+                                const fileArray = item.document_file.split(',').map(f => f.trim());
+
+                                fileArray.forEach((file, fileIndex) => {
+                                    const filePath = `/static/uploads/${file.replace(/\\/g, '/')}`;
+                                    const fileLi = document.createElement('li');
+                                    const link = document.createElement('a');
+
+                                    link.textContent = fileArray.length === 1 ? 'View Document' : `View Document ${fileIndex + 1}`;
+                                    link.style = "color: blue; text-decoration: underline;";
+
+                                    if (filePath.toLowerCase().endsWith('.docx')) {
+                                        link.href = '#';
+                                        link.onclick = function() { openWordFile(filePath); return false; };
+                                    } else {
+                                        link.href = filePath;
+                                        link.target = '_blank';
+                                    }
+
+                                    fileLi.innerHTML = `${item.title}`;
+                                    fileLi.appendChild(link);
+                                    docUl.appendChild(fileLi);
+                                });
+                            }else{
+                                const fileLi = document.createElement('li');
+                                fileLi.innerHTML = `${item.title}`;
+                                docUl.appendChild(fileLi);
+                            }
+
+                            li.appendChild(docUl);
+                            ol.appendChild(li); // append <li> directly to parent <ol>
+                        });
+                    }
+
+
+                    // reading and refferences bussiness ordinance
+                    if (res.sess_reading_ord && res.sess_reading_ord.length !== 0) {
+                        const ol = getbyId('session_proposed_ordinance');
+                        ol.innerHTML = ""; 
+                        ol.style.listStyleType = 'lower-alpha'; 
+
+                        res.sess_reading_ord.forEach(function(item, index) {
+                            const li = document.createElement('li'); 
+                            li.style = "color: black; font-weight: normal;margin-left: 20px;";
+                            li.textContent = item.tracking_no;
+
+                            const docUl = document.createElement('ul');
+                            docUl.style = "list-style-type: disc; margin-left: 10px;font-size:18px";
+
+                            if (item.document_file) {
+                                const fileArray = item.document_file.split(',').map(f => f.trim());
+
+                                fileArray.forEach((file, fileIndex) => {
+                                    const filePath = `/static/uploads/${file.replace(/\\/g, '/')}`;
+                                    const fileLi = document.createElement('li');
+                                    const link = document.createElement('a');
+
+                                    link.textContent = fileArray.length === 1 ? 'View Document' : `View Document ${fileIndex + 1}`;
+                                    link.style = "color: blue; text-decoration: underline;";
+
+                                    if (filePath.toLowerCase().endsWith('.docx')) {
+                                        link.href = '#';
+                                        link.onclick = function() { openWordFile(filePath); return false; };
+                                    } else {
+                                        link.href = filePath;
+                                        link.target = '_blank';
+                                    }
+
+                                    fileLi.innerHTML = `${item.title}`;
+                                    fileLi.appendChild(link);
+                                    docUl.appendChild(fileLi);
+                                });
+                            }else{
+                                const fileLi = document.createElement('li');
+                                fileLi.innerHTML = `${item.title}`;
+                                docUl.appendChild(fileLi);
+                            }
+
+                            li.appendChild(docUl);
+                            ol.appendChild(li); // append <li> directly to parent <ol>
+                        });
+                    }
+
+                    
+                    // reading and refferences bussiness resolution
+                    if (res.sess_reading_res && res.sess_reading_res.length !== 0) {
+                        const ol = getbyId('session_proposed_resolution');
+                        ol.innerHTML = ""; 
+                        ol.style.listStyleType = 'lower-alpha'; 
+
+                        res.sess_reading_res.forEach(function(item, index) {
+                            const li = document.createElement('li'); 
+                            li.style = "color: black; font-weight: normal;margin-left: 20px;";
+                            li.textContent = item.tracking_no;
+
+                            const docUl = document.createElement('ul');
+                            docUl.style = "list-style-type: disc; margin-left: 10px;font-size:18px";
+
+                            if (item.document_file) {
+                                const fileArray = item.document_file.split(',').map(f => f.trim());
+
+                                fileArray.forEach((file, fileIndex) => {
+                                    const filePath = `/static/uploads/${file.replace(/\\/g, '/')}`;
+                                    const fileLi = document.createElement('li');
+                                    const link = document.createElement('a');
+
+                                    link.textContent = fileArray.length === 1 ? 'View Document' : `View Document ${fileIndex + 1}`;
+                                    link.style = "color: blue; text-decoration: underline;";
+
+                                    if (filePath.toLowerCase().endsWith('.docx')) {
+                                        link.href = '#';
+                                        link.onclick = function() { openWordFile(filePath); return false; };
+                                    } else {
+                                        link.href = filePath;
+                                        link.target = '_blank';
+                                    }
+
+                                    fileLi.innerHTML = `${item.title} `;
+                                    fileLi.appendChild(link);
+                                    docUl.appendChild(fileLi);
+                                });
+                            }else{
+                                const fileLi = document.createElement('li');
+                                fileLi.innerHTML = `${item.title}`;
+                                docUl.appendChild(fileLi);
+                            }
+
+                            li.appendChild(docUl);
+                            ol.appendChild(li); // append <li> directly to parent <ol>
+                        });
+                    }
+
+                    if (res.sess_commitee_report) {
+                        const ol = getbyId('session_committee_report_');
+                        ol.innerHTML = "";
+
+                        if (res.sess_commitee_report.length !== 0) {
+                            // GROUP BY COMMITTEE
+                            const grouped = {};
+                            res.sess_commitee_report.forEach(item => {
+                                if (!grouped[item.committee]) grouped[item.committee] = [];
+                                grouped[item.committee].push(item);
+                            });
+
+                            let committeeIndex = 0; // A, B, C...
+
+                            Object.keys(grouped).forEach((committeeName) => {
+
+                                // A. Committee on ...
+                                const mainLi = document.createElement('li');
+                                mainLi.style = "color:black; font-weight:600; font-size:18px; list-style-type:none;";
+                                mainLi.textContent = `${String.fromCharCode(65 + committeeIndex)}. Committee on ${committeeName}, re:`;
+
+                                // a, b, c...
+                                const innerOl = document.createElement('ol');
+                                innerOl.style = "list-style-type: lower-alpha;";
+
+                                grouped[committeeName].forEach((item) => {
+                                    const subLi = document.createElement('li');
+                                    subLi.style = "color:black; font-weight:normal; font-size:18px;";
+
+                                    subLi.textContent = `${item.committee_number}`;
+
+                                    // SUBJECT LIST
+                                    const subjectUl = document.createElement('ul');
+                                    subjectUl.style = "margin-left:10px; list-style-type: disc;";
+
+                                    const liSubject = document.createElement('li');
+                                    liSubject.style = "color:black; font-weight:normal; font-size:18px;";
+
+                                    // FILE LINK
+                                    const filePath = `/static/${item.path}`;
+                                    const isDocx = filePath.toLowerCase().endsWith('.docx');
+
+                                    const link = document.createElement('a');
+                                    link.style = "color:blue; text-decoration:underline; margin-left:5px;";
+                                    link.textContent = "View document";
+
+                                    if (isDocx) {
+                                        link.href = "#";
+                                        link.onclick = function () {
+                                            openWordFile(filePath);
+                                            return false;
+                                        };
+                                    } else {
+                                        link.href = filePath;
+                                        link.target = "_blank";
+                                    }
+
+                                    liSubject.textContent = `${item.subject}`;
+                                    liSubject.appendChild(link);
+
+                                    subjectUl.appendChild(liSubject);
+                                    subLi.appendChild(subjectUl);
+                                    innerOl.appendChild(subLi);
+                                });
+
+                                mainLi.appendChild(innerOl);
+                                ol.appendChild(mainLi);
+
+                                committeeIndex++;
+                            });
+
+                        } 
+                    }
+
+
+                    // Business of the day
+                    if (res.sess_reading_botd) {
+                        const ol = getbyId('session_business_day')
+                        ol.innerHTML = ""
+                        if (res.sess_reading_botd.length!=0) {
+                            
+                            res.sess_reading_botd.forEach(function(item,index){
+
+                                const li1 = document.createElement('li');
+                                li1.style = "color: black; font-weight: normal;";
+
+                                const link = document.createElement('a');
+                                li1.innerHTML = `<strong>${item.committees} , re:</strong> ${item.title}`;
+                                if(item.document_file){
+                                    const fileArray = item.document_file.split(',').map(f => f.trim());
+    
+                                    fileArray.forEach((file, fileIndex) => {
+                                        const filePath = `/static/uploads/${file.replace(/\\/g, '/')}`; // convert backslashes to forward slashes
+                                        const fileIsDocx = filePath.toLowerCase().endsWith('.docx');
+    
+                                        const link = document.createElement('a');
+                                        link.textContent = fileArray.length === 1 ? 'View file' : `View file ${fileIndex + 1}`;
+                                        link.setAttribute('style', 'color: blue; text-decoration: underline; margin-left: 5px;');
+    
+                                        if (fileIsDocx) {
+                                            link.setAttribute('href', '#');
+                                            link.onclick = function () {
+                                                openWordFile(filePath);
+                                                return false;
+                                            };
+                                        } else {
+                                            link.setAttribute('href', filePath);
+                                            link.setAttribute('target', '_blank');
+                                        }
+    
+                                        li1.appendChild(link);
+    
+                                        if (fileIndex < fileArray.length - 1) {
+                                            li1.appendChild(document.createTextNode(', '));
+                                        }
+                                    });
+                                }
+
+                                ol.appendChild(li1);
+
+                                
+                            })
+                        }else{
+                            const li1 = document.createElement('li');
+                            li1.style = "color: black; font-weight: normal;";
+
+                            const link = document.createElement('a');
+                            li1.innerHTML = `NONE`;
+                            ol.appendChild(li1);
+                        }
+                    }
+
+                    // unfinished
+                    if (res.sess_reading_unfinish) {
+                        const ol = getbyId('session_unfinished_business');
+                        ol.innerHTML = "";
+
+                        if (res.sess_reading_unfinish.length !== 0) {
+
+                            res.sess_reading_unfinish.forEach(function (item, index) {
+
+                                /* ==============================
+                                UNFINISHED BUSINESS
+                                ============================== */
+                                if (item.tracking_no) {
+                                    const li1 = document.createElement('li');
+                                    li1.style.color = "black";
+                                    li1.style.fontWeight = "normal";
+
+                                    // Create a container span to hold title + links inline
+                                    const container = document.createElement('span');
+
+                                    // TITLE
+                                    container.innerHTML = `<strong>${item.committees ? item.committees + ", re:" : ""}</strong> ${item.title}`;
+
+                                    // FILES — append directly to container
+                                    if (item.document_file) {
+                                        item.document_file.split(',').forEach((file, idx) => {
+                                            const cleanFile = file.replace(/\\/g, '/');
+                                            const filePath = `/static/uploads/${cleanFile}`;
+                                            const link = document.createElement('a');
+                                            link.textContent = item.document_file.split(',').length === 1 ? ' View file' : ` View file ${idx + 1}`;
+                                            link.style.color = "blue";
+                                            link.style.textDecoration = "underline";
+                                            link.style.marginLeft = "5px";
+
+                                            if (filePath.toLowerCase().endsWith('.docx')) {
+                                                link.href = "#";
+                                                link.onclick = () => { openWordFile(filePath); return false; };
+                                            } else {
+                                                link.href = filePath;
+                                                link.target = "_blank";
+                                            }
+
+                                            container.appendChild(link);
+                                        });
+                                    }
+
+                                    li1.appendChild(container);
+                                    ol.appendChild(li1);
+                                }
+                                /* ==============================
+                                COMMITTEE REPORT
+                                ============================== */
+                                if (item.committee_report_committees) {
+                                    const li2 = document.createElement('li');
+                                    li2.style = "color: black; font-weight: normal;";
+
+                                    // TITLE (INLINE — FIXED)
+                                    const titleSpan2 = document.createElement('span');
+                                    titleSpan2.innerHTML =
+                                        `<strong>${item.committee_report_committees}</strong> ${item.committee_subject}`;
+                                    li2.appendChild(titleSpan2);
+
+                                    // FILES — RIGHT AFTER TITLE
+                                    if (item.committee_report_file) {
+                                        const crFileArray = item.committee_report_file
+                                            .split(',')
+                                            .map(f => f.trim());
+
+                                        crFileArray.forEach((file, fileIndex) => {
+
+                                            file = file.replace(/^uploads[\\/]+/, '');
+                                            const cleanFile = file.replace(/\\/g, '/');
+                                            const filePath = `/static/uploads/${cleanFile}`;
+                                            const isDocx = filePath.toLowerCase().endsWith('.docx');
+
+                                            const link = document.createElement('a');
+                                            link.textContent = crFileArray.length === 1
+                                                ? ' View file'
+                                                : ` View file ${fileIndex + 1}`;
+
+                                            link.style = "color: blue; text-decoration: underline; margin-left: 5px;";
+
+                                            if (isDocx) {
+                                                link.href = '#';
+                                                link.onclick = function () {
+                                                    openWordFile(filePath);
+                                                    return false;
+                                                };
+                                            } else {
+                                                link.href = filePath;
+                                                link.target = '_blank';
+                                            }
+
+                                            li2.appendChild(link);
+                                        });
+                                    }
+
+                                    ol.appendChild(li2);
+                                }
+
+                            });
+
+                        } else {
+                            const li = document.createElement('li');
+                            li.style = "color: black; font-weight: normal;";
+                            li.textContent = "NONE";
+                            ol.appendChild(li);
+                        }
+                    }
+
+                    // announcement
+                    if (res.sess_announcement) {
+                        if (res.sess_announcement.length!=0) {
+
+                            const ol = getbyId('session_other_matters')
+                            ol.innerHTML = ""
+                            res.sess_announcement.forEach(function(item, index) {
+                                const li1 = document.createElement('li');
+                                li1.style = "color: black; font-weight: normal;";
+                                li1.textContent = `${item.announcement} `;
+
+                                if(item.file){
+                                    const fileArray = item.file.split(',').map(f => f.trim());
+
+                                    fileArray.forEach((file, fileIndex) => {
+                                        const filePath = `/static/${file.replace(/\\/g, '/')}`; // convert backslashes to forward slashes
+                                        const fileIsDocx = filePath.toLowerCase().endsWith('.docx');
+
+                                        const link = document.createElement('a');
+                                        link.textContent = fileArray.length === 1 ? 'View file' : `View file ${fileIndex + 1}`;
+                                        link.setAttribute('style', 'color: blue; text-decoration: underline; margin-left: 5px; font-size: 18px!important');
+
+                                        if (fileIsDocx) {
+                                            link.setAttribute('href', '#');
+                                            link.onclick = function () {
+                                                openWordFile(filePath);
+                                                return false;
+                                            };
+                                        } else {
+                                            link.setAttribute('href', filePath);
+                                            link.setAttribute('target', '_blank');
+                                        }
+
+                                        li1.appendChild(link);
+
+                                        // Add a comma + space if not the last file
+                                        if (fileIndex < fileArray.length - 1) {
+                                            li1.appendChild(document.createTextNode(', '));
+                                        }
+                                    });
+
+                                }
+                                
+                                ol.appendChild(li1);
+                            });
+                            
+                        }
+                    }
+                    
+                    // code reff
+                    if (res.sess_code_ref) {
+                        if(res.sess_code_ref.length){
+                            res.sess_code_ref.forEach(function(item,index){
+                                if(item.type==1){
+                                    var ol1 = byId("div_code_1");
+                                }else{
+                                    var ol1 = byId("div_ref_1");
+                                }
+                                var li2 = document.createElement('li')
+                                li2.innerHTML = `<a style="font-size:18px!important" target='_blank' href='../static/uploads/${item.path}'>${item.title}</a>`
+                                ol1.appendChild(li2)
+                            })
+                        }
+                    }
+
+                    // summary
+                    // if (res.sess_summary) {
+                    //     if(res.sess_summary.length){
+                    //     }
+                    // }
+                    
+                    $("#cob_modal").modal('show');
+
+                }else{
+                    alert("INVALID SESSION NUMBER")
+                }
+            }
+        })
+        .catch((error) => {
+            console.error('Error:', error);
+        });
+    }
+
+    function ordinal_suffix_of(i) {
+        var j = i % 10,
+            k = i % 100;
+        if (j == 1 && k != 11) {
+            return i + 'st';
+        }
+        if (j == 2 && k != 12) {
+            return i + 'nd';
+        }
+        if (j == 3 && k != 13) {
+            return i + 'rd';
+        }
+        return i + 'th';
+    }
+
+    function populateSession(data){
+        if (data) {
+            var form  = byId("form_session2");
+
+            $('.video-list ul').empty();
+            $('.video-list1 ul').empty();
+            $('.video-list2 ul').empty();
+
+            getbyId('div_committee_report_').innerHTML = ""
+            getbyId('div_business1').innerHTML = ""
+            getbyId('div_unfinished').innerHTML = ""
+            getbyId('div_announcement_').innerHTML = ""
+            getbyId('div_additional_refferals').innerHTML = ""
+            getbyId('div_question_hour').innerHTML = ""
+            getbyId('div_privilege_hour').innerHTML = ""
+            getbyId('div_reading_consideration').innerHTML=""
+            getbyId('div_petitions_for_refferals').innerHTML=  ""
+            getbyId('div_propose_ord').innerHTML=  ""
+            getbyId('div_propose_reso').innerHTML=  ""
+            
+            bussiness1Count = 0;
+            unfinishedCount = 0;
+            announcement_Count = 0;
+            committee_reportCount = 0;
+            privilege_hourCount = 0;
+            additional_refferalsCount = 0;
+            questionCount = 0;
+            readingCount = 0;
+            petitions_for_refferalsCount = 0;
+            propose_ordCount = 0;
+            propose_resoCount = 0;
+            
+            // new code
+            sendDataWithCallback('/get_session_video',{session_id:data.sess_data[0].session_id},(res)=>{
+                if(res.length){
+                    if(res[0].intro_path!='None'){
+                        const url_intro = '/static/' + res[0].intro_path
+                        const li = ` <li> <video controls="controls type="video/mp4" width="400px" height="200px">
+                        <source src="${url_intro}" type="video/mp4">
+                        </video><span><i class="fa fa-trash"></i></span></li>`
+                        $('.video-list ul').append(li);
+                    }
+
+                    if(res[0].national_anthem_path!='None'){
+                        const url_anthem = '/static/' + res[0].national_anthem_path
+                        const li1 = ` <li> <video controls="controls type="video/mp4" width="400px" height="200px">
+                        <source src="${url_anthem}" type="video/mp4">
+                        </video><span><i class="fa fa-trash"></i></span></li>`
+                        $('.video-list1 ul').append(li1);
+                    }
+                    
+                    if(res[0].prayer_path!='None'){
+                        const url_prayer = '/static/' + res[0].prayer_path
+                        const li2 = ` <li> <video controls="controls type="video/mp4" width="400px" height="200px">
+                        <source src="${url_prayer}" type="video/mp4">
+                        </video><span><i class="fa fa-trash"></i></span></li>`
+                        $('.video-list2 ul').append(li2);
+                    }
+                    
+                }
+            })
+
+            // privious minutes
+            sendDataWithCallback('/get_session_privous_minutes', {session_id:data.sess_data[0].session_id}, (res)=>{
+                res.forEach(function(item, index){
+                    add_reading_consid();
+                    $("#reading_consid_minutes_id" + index).val(item['minutes_id']).trigger("chosen:updated");
+                })
+            })
+
+            // privilege hour
+            sendDataWithCallback('/get_session_previlege_hour', {session_id:data.sess_data[0].session_id}, (res)=>{
+                res.forEach(function(item, index){
+                    add_privilege_hour();
+                    $("#privilege_hour_tracking_no" + index).val(item['info_id']).trigger("chosen:updated");
+                })
+            })
+
+            // Quesition Hour
+            sendDataWithCallback('/get_session_question_hour', {session_id:data.sess_data[0].session_id}, (res)=>{
+                res.forEach(function(item, index){
+                    add_question_hour();
+                    var fullname = "question_hour["+index+"][fullname]";
+                    form[fullname].value = item['fullname'];
+                    var designation = "question_hour["+index+"][designation]";
+                    form[designation].value = item['designation'];
+                    var subject = "question_hour["+index+"][subject]";
+                    form[subject].value = item['subject'];
+                })
+            })
+
+            // privilege hour
+            sendDataWithCallback('/get_session_additional_refferal', {session_id:data.sess_data[0].session_id}, (res)=>{
+                res.forEach(function(item, index){
+                    add_refferals_communication();
+                    $("#additional_refferals_tracking_no" + index).val(item['tracking_no']).trigger("chosen:updated");
+                })
+            })
+
+
+            // committee report
+            sendDataWithCallback('/get_session_committee_report', {session_id:data.sess_data[0].session_id}, (res)=>{
+                res.forEach(function(item, index){
+                    add_committee_report_();
+                    $("#committee_report_id" + index).val(item['committee_report_id']).trigger("chosen:updated");
+                    var committee_report_id = "committee_report["+index+"][committee_report_id]";
+                    form[committee_report_id].value = item['committee_report_id'];
+                })
+            })
+
+
+            // unfinished_bussiness
+            sendDataWithCallback('/get_session_unfinished_bussiness', {session_id:data.sess_data[0].session_id}, (res)=>{
+                res.forEach(function(item, index){
+                    add_unfinished();
+
+                    $("#unfinished_bussiness_tracking_no" + index).val(item['tracking_no']).trigger("chosen:updated");
+                    if(item.committees){
+                        let committee_ids = String(item.committees).replace(/[\[\]']/g, "").split(",");
+                        $('#unfinished_bussiness_committee' + index).val(committee_ids).trigger('chosen:updated');
+                    }
+
+                    if(item.committee_report_unfinished){
+                        let committee_report_ids = String(item.committee_report_unfinished).replace(/[\[\]']/g, "").split(",");
+                        $('#unfinished_bussiness_committee_report' + index).val(committee_report_ids).trigger('chosen:updated');
+                    }
+                })
+            })
+
+            // bussiness1
+            sendDataWithCallback('/get_session_botd', {session_id:data.sess_data[0].session_id}, (res)=>{
+                res.forEach(function(item, index){
+                    add_bussiness1();
+                    $("#bussiness_of_the_day_tracking_no" + index).val(item['tracking_no']).trigger("chosen:updated");
+                    let committee_ids = item.committees.replace(/[\[\]']/g, "").split(",");
+                    $('#bussiness_of_the_day_committee' + index).val(committee_ids).trigger('chosen:updated');
+                })
+            })
+
+
+            // Announcement
+            sendDataWithCallback('/get_session_announcement', {session_id:data.sess_data[0].session_id}, (res)=>{
+                res.forEach(function(item, index){
+                    add_announcement();
+                    $("#announcement_councilor" + index).val(item['councilor']).trigger("chosen:updated");
+                    var announcement = "announcement_["+index+"][announcement]";
+                    form[announcement].value = item['announcement'];
+                })
+            })
+
+            // petetions
+            sendDataWithCallback('/get_session_petition_for_refferal', {session_id:data.sess_data[0].session_id}, (res)=>{
+                res.forEach(function(item, index){
+                    add_petitions_for_refferals();
+                    $("#petitions_for_refferals_tracking_no" + index).val(item['tracking_no']).trigger("chosen:updated");
+                })
+            })
+
+             // proposed_ordi
+            sendDataWithCallback('/get_session_proposed_ordi', {session_id:data.sess_data[0].session_id}, (res)=>{
+                res.forEach(function(item, index){
+                    add_propose_ord();
+                    $("#propose_ord_tracking_no" + index).val(item['tracking_no']).trigger("chosen:updated");
+                })
+            })
+
+            // proposed_reso
+            sendDataWithCallback('/get_session_proposed_reso', {session_id:data.sess_data[0].session_id}, (res)=>{
+                res.forEach(function(item, index){
+                    add_propose_reso();
+                    $("#propose_res_tracking_no" + index).val(item['tracking_no']).trigger("chosen:updated");
+                })
+            })
+        }
+    }
+    
+    function populate_active_councilor(){
+         getDataWithCallback('/get_all_active_councilor', function(res){
+            if (res) {
+                if (res.length!=0) {
+                    var form = getbyId("form_session");
+                    res.forEach(function(item,index){
+                        populateRollcall();
+                        var name = "attendance["+index+"][names]"
+                        form[name].value = item['fullname'];
+                    });
+                }
+            }
+        });
+    }
+
+    function get_sp_number_active(){
+        getDataWithCallback('/get_sp_active', function(res){
+            for(var x=0; x<res.length; x++){
+                if(res[x].status=='ACTIVE'){
+                    $('#sp_number').append(`<option selected value="${res[x].sp_id}"> ${res[x].sp_title} </option>`);
+                }else{
+                    $('#sp_number').append(`<option value="${res[x].sp_id}"> ${res[x].sp_title} </option>`);
+                }
+            }
+        });
+    }
+
+    function populate_code_references(){    
+        getDataWithCallback('/get_code_and_references', function(res){
+            if (res) {
+                if (res.length!=0) {
+                    var form = getbyId("form_session");
+                    res.forEach(function(item,index){
+                        add_code_ref();
+                        var name = "code_ref["+index+"][title]"
+                        form[name].value = item.title;
+                    });
+                }
+            }
+        });
+    }
+
+
+</script>

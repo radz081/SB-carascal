@@ -1,0 +1,460 @@
+<div class="colfull">
+	<form id="form_role_access">
+		<input type="text" hidden="" id="role_login_id" name="login_id">
+		<p id="role_fullname" style="text-transform: uppercase;"></p>
+
+		<div class="form-check form-check-inline">
+		  <p>ROLE</p>
+		</div>
+
+		<div class="form-check form-check-inline">
+		  <input required class="form-check-input" type="radio" name="role_access" id="exampleRadios1" value="1" onclick="getbyId('div_role_config').style.display='block'">
+		  <label class="form-check-label" for="exampleRadios1">
+		    User
+		  </label>
+		</div>
+
+		<div class="form-check form-check-inline">
+		  <input required class="form-check-input" type="radio" name="role_access" id="exampleRadios2" value="2" onclick="getbyId('div_role_config').style.display='none'">
+		  <label class="form-check-label" for="exampleRadios2">
+		    Admin
+		  </label>
+		</div>
+
+		
+		<div class="list-group" id="div_role_config">
+			<label class="list-group-item d-flex justify-content-between align-items-center">
+				<div class="form-check">
+					<input class="form-check-input" type="checkbox" name="session" id="sessionMain" 
+						onchange="document.getElementById('sessionRead').checked = this.checked; document.getElementById('sessionWrite').checked = false">
+					<label class="form-check-label fw-bold" for="sessionMain">Session</label>
+					<div class="text-muted small">/sessions</div>
+				</div>
+				<div class="d-flex gap-2">
+					<div class="form-check form-check-inline">
+					<input class="form-check-input" type="checkbox" name="session_read" id="sessionRead"
+					onchange="document.getElementById('sessionMain').checked = this.checked; document.getElementById('sessionWrite').checked = false">
+					<label class="form-check-label" for="sessionRead">Read</label>
+					</div>
+					<div class="form-check form-check-inline">
+					<input class="form-check-input" type="checkbox" name="session_write" id="sessionWrite"
+					onchange="document.getElementById('sessionMain').checked = this.checked; document.getElementById('sessionRead').checked = this.checked">
+					<label class="form-check-label" for="sessionWrite">Write</label>
+					</div>
+				</div>
+			</label>
+
+			<label class="list-group-item d-flex justify-content-between align-items-center">
+				<div class="form-check">
+					<input class="form-check-input" type="checkbox" name="ordinance" id="ordinanceMain" 
+						onchange="document.getElementById('ordinanceRead').checked = this.checked; document.getElementById('ordinanceWrite').checked = false">
+					<label class="form-check-label fw-bold" for="ordinanceMain">All Ordinance</label>
+				</div>
+				<div class="d-flex gap-2">
+					<div class="form-check form-check-inline">
+					<input class="form-check-input" type="checkbox" name="ordinance_read" id="ordinanceRead"
+							onchange="document.getElementById('ordinanceMain').checked = this.checked; document.getElementById('ordinanceWrite').checked = false">
+					<label class="form-check-label" for="ordinanceRead">Read</label>
+					</div>
+					<div class="form-check form-check-inline">
+					<input class="form-check-input" type="checkbox" name="ordinance_write" id="ordinanceWrite"
+					onchange="document.getElementById('ordinanceMain').checked = this.checked; document.getElementById('ordinanceRead').checked = this.checked">
+					<label class="form-check-label" for="ordinanceWrite">Write</label>
+					</div>
+				</div>
+			</label>
+
+			<!-- All Resolution -->
+			<label class="list-group-item d-flex justify-content-between align-items-center">
+				<div class="form-check">
+					<input class="form-check-input" type="checkbox" name="resolution" id="resolutionMain"
+						onchange="document.getElementById('resolutionRead').checked = this.checked; document.getElementById('resolutionWrite').checked = false">
+					<label class="form-check-label fw-bold" for="resolutionMain">All Resolution</label>
+				</div>
+				<div class="d-flex gap-2">
+					<div class="form-check form-check-inline">
+					<input class="form-check-input" type="checkbox" name="resolution_read" id="resolutionRead"
+							onchange="document.getElementById('resolutionMain').checked = this.checked; document.getElementById('resolutionWrite').checked = false">
+					<label class="form-check-label" for="resolutionRead">Read</label>
+					</div>
+					<div class="form-check form-check-inline">
+					<input class="form-check-input" type="checkbox" name="resolution_write" id="resolutionWrite"
+					onchange="document.getElementById('resolutionMain').checked = this.checked; document.getElementById('resolutionRead').checked = this.checked">
+					<label class="form-check-label" for="resolutionWrite">Write</label>
+					</div>
+				</div>
+			</label>
+
+
+			<!-- Petition -->
+			<!-- <label class="list-group-item d-flex justify-content-between align-items-center">
+				<div class="form-check">
+					<input class="form-check-input" type="checkbox" name="petition" id="petitionMain"
+						onchange="document.getElementById('petitionRead').checked = this.checked; document.getElementById('petitionWrite').checked = false">
+					<label class="form-check-label fw-bold" for="petitionMain">Petition</label>
+					<div class="text-muted small">/petition</div>
+				</div>
+				<div class="d-flex gap-2">
+					<div class="form-check form-check-inline">
+					<input class="form-check-input" type="checkbox" name="petition_read" id="petitionRead"
+							onchange="document.getElementById('petitionMain').checked = this.checked; document.getElementById('petitionWrite').checked = false">
+					<label class="form-check-label" for="petitionRead">Read</label>
+					</div>
+					<div class="form-check form-check-inline">
+					<input class="form-check-input" type="checkbox" name="petition_write" id="petitionWrite"
+					onchange="document.getElementById('petitionMain').checked = this.checked; document.getElementById('petitionRead').checked = this.checked">
+					<label class="form-check-label" for="petitionWrite">Write</label>
+					</div>
+				</div>
+			</label> -->
+
+
+			<!-- Minutes -->
+			<label class="list-group-item d-flex justify-content-between align-items-center">
+				<div class="form-check">
+					<input class="form-check-input" type="checkbox" name="minutes" id="minutesMain"
+						onchange="document.getElementById('minutesRead').checked = this.checked; document.getElementById('minutesWrite').checked = false">
+					<label class="form-check-label fw-bold" for="minutesMain">Minutes</label>
+					<div class="text-muted small">/minutes</div>
+				</div>
+				<div class="d-flex gap-2">
+					<div class="form-check form-check-inline">
+					<input class="form-check-input" type="checkbox" name="minutes_read" id="minutesRead"
+							onchange="document.getElementById('minutesMain').checked = this.checked; document.getElementById('minutesWrite').checked = false">
+					<label class="form-check-label" for="minutesRead">Read</label>
+					</div>
+					<div class="form-check form-check-inline">
+					<input class="form-check-input" type="checkbox" name="minutes_write" id="minutesWrite"
+					onchange="document.getElementById('minutesMain').checked = this.checked; document.getElementById('minutesRead').checked = this.checked">
+					<label class="form-check-label" for="minutesWrite">Write</label>
+					</div>
+				</div>
+			</label>
+
+
+			<!-- Document Tracking -->
+			<label class="list-group-item d-flex justify-content-between align-items-center">
+				<div class="form-check">
+					<input class="form-check-input" type="checkbox" name="document_tracking" id="documentTrackingMain"
+						onchange="document.getElementById('documentTrackingRead').checked = this.checked; document.getElementById('documentTrackingWrite').checked = false">
+					<label class="form-check-label fw-bold" for="documentTrackingMain">Document Tracking</label>
+					<div class="text-muted small">/document_tracking</div>
+				</div>
+				<div class="d-flex gap-2">
+					<div class="form-check form-check-inline">
+					<input class="form-check-input" type="checkbox" name="document_tracking_read" id="documentTrackingRead"
+							onchange="document.getElementById('documentTrackingMain').checked = this.checked; document.getElementById('documentTrackingWrite').checked = false">
+					<label class="form-check-label" for="documentTrackingRead">Read</label>
+					</div>
+					<div class="form-check form-check-inline">
+					<input class="form-check-input" type="checkbox" name="document_tracking_write" id="documentTrackingWrite"
+					onchange="document.getElementById('documentTrackingMain').checked = this.checked; document.getElementById('documentTrackingRead').checked = this.checked">
+					<label class="form-check-label" for="documentTrackingWrite">Write</label>
+					</div>
+				</div>
+			</label>
+
+
+			<!-- Sp/Sb Budget -->
+			<label class="list-group-item d-flex justify-content-between align-items-center">
+				<div class="form-check">
+					<input class="form-check-input" type="checkbox" name="sp_budget" id="spBudgetMain"
+						onchange="document.getElementById('spBudgetRead').checked = this.checked; document.getElementById('spBudgetWrite').checked = false">
+					<label class="form-check-label fw-bold" for="spBudgetMain">Sp/Sb Budget</label>
+					<div class="text-muted small">/sp_budget</div>
+				</div>
+				<div class="d-flex gap-2">
+					<div class="form-check form-check-inline">
+					<input class="form-check-input" type="checkbox" name="sp_budget_read" id="spBudgetRead"
+							onchange="document.getElementById('spBudgetMain').checked = this.checked; document.getElementById('spBudgetWrite').checked = false">
+					<label class="form-check-label" for="spBudgetRead">Read</label>
+					</div>
+					<div class="form-check form-check-inline">
+					<input class="form-check-input" type="checkbox" name="sp_budget_write" id="spBudgetWrite"
+					onchange="document.getElementById('spBudgetMain').checked = this.checked; document.getElementById('spBudgetRead').checked = this.checked">
+					<label class="form-check-label" for="spBudgetWrite">Write</label>
+					</div>
+				</div>
+			</label>
+
+
+			<!-- All Configuration -->
+			<label class="list-group-item d-flex justify-content-between align-items-center">
+				<div class="form-check">
+					<input class="form-check-input" type="checkbox" name="configuration" id="configurationMain"
+						onchange="document.getElementById('configurationRead').checked = this.checked; document.getElementById('configurationWrite').checked = false">
+					<label class="form-check-label fw-bold" for="configurationMain">All Configuration</label>
+				</div>
+				<div class="d-flex gap-2">
+					<div class="form-check form-check-inline">
+					<input class="form-check-input" type="checkbox" name="configuration_read" id="configurationRead"
+							onchange="document.getElementById('configurationMain').checked = this.checked; document.getElementById('configurationWrite').checked = false">
+					<label class="form-check-label" for="configurationRead">Read</label>
+					</div>
+					<div class="form-check form-check-inline">
+					<input class="form-check-input" type="checkbox" name="configuration_write" id="configurationWrite"
+					onchange="document.getElementById('configurationMain').checked = this.checked; document.getElementById('configurationRead').checked = this.checked">
+					<label class="form-check-label" for="configurationWrite">Write</label>
+					</div>
+				</div>
+			</label>
+
+
+			<!-- Committee -->
+			<label class="list-group-item d-flex justify-content-between align-items-center">
+				<div class="form-check">
+					<input class="form-check-input" type="checkbox" name="committee" id="committeeMain"
+						onchange="document.getElementById('committeeRead').checked = this.checked; document.getElementById('committeeWrite').checked = false">
+					<label class="form-check-label fw-bold" for="committeeMain">Committee</label>
+					<div class="text-muted small">/committee</div>
+				</div>
+				<div class="d-flex gap-2">
+					<div class="form-check form-check-inline">
+					<input class="form-check-input" type="checkbox" name="committee_read" id="committeeRead"
+							onchange="document.getElementById('committeeMain').checked = this.checked; document.getElementById('committeeWrite').checked = false">
+					<label class="form-check-label" for="committeeRead">Read</label>
+					</div>
+					<div class="form-check form-check-inline">
+					<input class="form-check-input" type="checkbox" name="committee_write" id="committeeWrite"
+					onchange="document.getElementById('committeeMain').checked = this.checked; document.getElementById('committeeRead').checked = this.checked">
+					<label class="form-check-label" for="committeeWrite">Write</label>
+					</div>
+				</div>
+			</label>
+
+
+		  	<!-- Gallery -->
+			<label class="list-group-item d-flex justify-content-between align-items-center">
+				<div class="form-check">
+					<input class="form-check-input" type="checkbox" name="gallery_albums" id="galleryMain"
+						onchange="document.getElementById('galleryRead').checked = this.checked; document.getElementById('galleryWrite').checked = false">
+					<label class="form-check-label fw-bold" for="galleryMain">Gallery</label>
+					<div class="text-muted small">/gallery_albums</div>
+				</div>
+				<div class="d-flex gap-2">
+					<div class="form-check form-check-inline">
+					<input class="form-check-input" type="checkbox" name="gallery_read" id="galleryRead"
+							onchange="document.getElementById('galleryMain').checked = this.checked; document.getElementById('galleryWrite').checked = false">
+					<label class="form-check-label" for="galleryRead">Read</label>
+					</div>
+					<div class="form-check form-check-inline">
+					<input class="form-check-input" type="checkbox" name="gallery_write" id="galleryWrite"
+					onchange="document.getElementById('galleryMain').checked = this.checked; document.getElementById('galleryRead').checked = this.checked">
+					<label class="form-check-label" for="galleryWrite">Write</label>
+					</div>
+				</div>
+			</label>
+
+
+		  	<!-- Executive Order -->
+			<label class="list-group-item d-flex justify-content-between align-items-center">
+				<div class="form-check">
+					<input class="form-check-input" type="checkbox" name="executive_order" id="executiveOrderMain"
+						onchange="document.getElementById('executiveOrderRead').checked = this.checked; document.getElementById('executiveOrderWrite').checked = false">
+					<label class="form-check-label fw-bold" for="executiveOrderMain">Executive Order</label>
+					<div class="text-muted small">/executive_order</div>
+				</div>
+				<div class="d-flex gap-2">
+					<div class="form-check form-check-inline">
+					<input class="form-check-input" type="checkbox" name="executive_order_read" id="executiveOrderRead"
+							onchange="document.getElementById('executiveOrderMain').checked = this.checked; document.getElementById('executiveOrderWrite').checked = false">
+					<label class="form-check-label" for="executiveOrderRead">Read</label>
+					</div>
+					<div class="form-check form-check-inline">
+					<input class="form-check-input" type="checkbox" name="executive_order_write" id="executiveOrderWrite"
+					onchange="document.getElementById('executiveOrderMain').checked = this.checked; document.getElementById('executiveOrderRead').checked = this.checked">
+					<label class="form-check-label" for="executiveOrderWrite">Write</label>
+					</div>
+				</div>
+			</label>
+
+
+		  	<!-- Memorandum -->
+			<label class="list-group-item d-flex justify-content-between align-items-center">
+				<div class="form-check">
+					<input class="form-check-input" type="checkbox" name="memorandum" id="memorandumMain"
+						onchange="document.getElementById('memorandumRead').checked = this.checked; document.getElementById('memorandumWrite').checked = false">
+					<label class="form-check-label fw-bold" for="memorandumMain">Memorandum</label>
+					<div class="text-muted small">/memorandum</div>
+				</div>
+				<div class="d-flex gap-2">
+					<div class="form-check form-check-inline">
+					<input class="form-check-input" type="checkbox" name="memorandum_read" id="memorandumRead"
+							onchange="document.getElementById('memorandumMain').checked = this.checked; document.getElementById('memorandumWrite').checked = false">
+					<label class="form-check-label" for="memorandumRead">Read</label>
+					</div>
+					<div class="form-check form-check-inline">
+					<input class="form-check-input" type="checkbox" name="memorandum_write" id="memorandumWrite"
+					onchange="document.getElementById('memorandumMain').checked = this.checked; document.getElementById('memorandumRead').checked = this.checked">
+					<label class="form-check-label" for="memorandumWrite">Write</label>
+					</div>
+				</div>
+			</label>
+
+
+		  <!-- <label class="list-group-item" style="padding-left: 40px!important">
+		    <input class="form-check-input me-1" name="barangay_ordinance" type="checkbox" style="position: absolute;left: 10px;">
+		    <div class="ms-2 me-auto">
+		      <div class="fw-bold">Barangay Ordinance</div>
+		      /barangay_ordinance
+		    </div>
+		  </label>
+
+		  <label class="list-group-item" style="padding-left: 40px!important">
+		    <input class="form-check-input me-1" name="barangay_resolution" type="checkbox" style="position: absolute;left: 10px;">
+		    <div class="ms-2 me-auto">
+		      <div class="fw-bold">Barangay Resolution</div>
+		      /barangay_resolution
+		    </div>
+		  </label> -->
+
+		  	<!-- Code and References -->
+			<label class="list-group-item d-flex justify-content-between align-items-center">
+				<div class="form-check">
+					<input class="form-check-input" type="checkbox" name="documents_refferals" id="documentsRefferalsMain"
+						onchange="document.getElementById('documentsRefferalsRead').checked = this.checked; document.getElementById('documentsRefferalsWrite').checked = false">
+					<label class="form-check-label fw-bold" for="documentsRefferalsMain">Code and Refferences</label>
+					<div class="text-muted small">/documents_refferals</div>
+				</div>
+				<div class="d-flex gap-2">
+					<div class="form-check form-check-inline">
+					<input class="form-check-input" type="checkbox" name="documents_refferals_read" id="documentsRefferalsRead"
+							onchange="document.getElementById('documentsRefferalsMain').checked = this.checked; document.getElementById('documentsRefferalsWrite').checked = false">
+					<label class="form-check-label" for="documentsRefferalsRead">Read</label>
+					</div>
+					<div class="form-check form-check-inline">
+					<input class="form-check-input" type="checkbox" name="documents_refferals_write" id="documentsRefferalsWrite"
+					onchange="document.getElementById('documentsRefferalsMain').checked = this.checked; document.getElementById('documentsRefferalsRead').checked = this.checked">
+					<label class="form-check-label" for="documentsRefferalsWrite">Write</label>
+					</div>
+				</div>
+			</label>
+
+
+		  <label class="list-group-item" style="padding-left: 40px!important">
+		    <input class="form-check-input me-1" name="reports" type="checkbox" style="position: absolute;left: 10px;">
+		    <div class="ms-2 me-auto">
+		      <div class="fw-bold">Reports</div>
+		      /reports
+		    </div>
+		  </label>
+
+		  <!-- <label class="list-group-item" style="padding-left: 40px!important">
+		    <input class="form-check-input me-1" name="profiling_ordinance" type="checkbox" style="position: absolute;left: 10px;">
+		    <div class="ms-2 me-auto">
+		      <div class="fw-bold">Profiling Ordinance</div>
+		      /profiling_ordinance
+		    </div>
+		  </label> -->
+
+		  	<!-- Citizen Charter -->
+			<label class="list-group-item d-flex justify-content-between align-items-center">
+				<div class="form-check">
+					<input class="form-check-input" type="checkbox" name="citezen_charter" id="citezenCharterMain"
+						onchange="document.getElementById('citezenCharterRead').checked = this.checked; document.getElementById('citezenCharterWrite').checked = false">
+					<label class="form-check-label fw-bold" for="citezenCharterMain">Citizen Charter</label>
+					<div class="text-muted small">/citezen_charter</div>
+				</div>
+				<div class="d-flex gap-2">
+					<div class="form-check form-check-inline">
+					<input class="form-check-input" type="checkbox" name="citezen_charter_read" id="citezenCharterRead"
+							onchange="document.getElementById('citezenCharterMain').checked = this.checked; document.getElementById('citezenCharterWrite').checked = false">
+					<label class="form-check-label" for="citezenCharterRead">Read</label>
+					</div>
+					<div class="form-check form-check-inline">
+					<input class="form-check-input" type="checkbox" name="citezen_charter_write" id="citezenCharterWrite"
+					onchange="document.getElementById('citezenCharterMain').checked = this.checked; document.getElementById('citezenCharterRead').checked = this.checked">
+					<label class="form-check-label" for="citezenCharterWrite">Write</label>
+					</div>
+				</div>
+			</label>
+
+
+		  	<!-- Rules and Procedure -->
+			<label class="list-group-item d-flex justify-content-between align-items-center">
+				<div class="form-check">
+					<input class="form-check-input" type="checkbox" name="rules_and_procedure" id="rulesProcedureMain"
+						onchange="document.getElementById('rulesProcedureRead').checked = this.checked; document.getElementById('rulesProcedureWrite').checked = false">
+					<label class="form-check-label fw-bold" for="rulesProcedureMain">Rules and Procedure</label>
+					<div class="text-muted small">/rules_and_procedure</div>
+				</div>
+				<div class="d-flex gap-2">
+					<div class="form-check form-check-inline">
+					<input class="form-check-input" type="checkbox" name="rules_and_procedure_read" id="rulesProcedureRead"
+							onchange="document.getElementById('rulesProcedureMain').checked = this.checked; document.getElementById('rulesProcedureWrite').checked = false">
+					<label class="form-check-label" for="rulesProcedureRead">Read</label>
+					</div>
+					<div class="form-check form-check-inline">
+					<input class="form-check-input" type="checkbox" name="rules_and_procedure_write" id="rulesProcedureWrite"
+					onchange="document.getElementById('rulesProcedureMain').checked = this.checked; document.getElementById('rulesProcedureRead').checked = this.checked">
+					<label class="form-check-label" for="rulesProcedureWrite">Write</label>
+					</div>
+				</div>
+			</label>
+
+		  	<!-- Download Center -->
+			<label class="list-group-item d-flex justify-content-between align-items-center">
+				<div class="form-check">
+					<input class="form-check-input" type="checkbox" name="download_center" id="downloadCenterMain"
+						onchange="document.getElementById('downloadCenterRead').checked = this.checked; document.getElementById('downloadCenterWrite').checked = false">
+					<label class="form-check-label fw-bold" for="downloadCenterMain">Download Center</label>
+					<div class="text-muted small">/download_center</div>
+				</div>
+				<div class="d-flex gap-2">
+					<div class="form-check form-check-inline">
+					<input class="form-check-input" type="checkbox" name="download_center_read" id="downloadCenterRead"
+							onchange="document.getElementById('downloadCenterMain').checked = this.checked; document.getElementById('downloadCenterWrite').checked = false">
+					<label class="form-check-label" for="downloadCenterRead">Read</label>
+					</div>
+					<div class="form-check form-check-inline">
+					<input class="form-check-input" type="checkbox" name="download_center_write" id="downloadCenterWrite"
+					onchange="document.getElementById('downloadCenterMain').checked = this.checked; document.getElementById('downloadCenterRead').checked = this.checked">
+					<label class="form-check-label" for="downloadCenterWrite">Write</label>
+					</div>
+				</div>
+			</label>
+
+		</div>
+
+		<div style="text-align: center;">
+			<button type="submit" class="btn btn-success">SAVE</button>
+		</div>
+	</form>
+</div>
+
+<script type="text/javascript">
+	$(document).ready(function(){
+
+		var form_id='#form_role_access'
+		 $(form_id).submit(function(e){
+		 	var form_save = $(form_id).serializeObject();
+	        e.preventDefault();
+
+			console.log(form_save, "form_save")
+	        swal.fire({
+				title: "Are you sure want to save?",
+				text: "Click ok to continue",
+				type: "info",
+				showCancelButton: true,
+				showLoaderOnConfirm: true,
+				preConfirm: () => {
+					return fetch(console.log("log"))
+					.then(
+						sendDataWithCallback('/save_role',form_save,function(res){
+							if(res){
+								load_login()
+								saved(res)
+							}
+						})
+					)
+					.catch(() => {
+					    Swal.fire({
+					      icon: 'error',
+					      title: 'Error occured'
+					    })
+					})
+				}
+			})
+	    })
+	})
+</script>

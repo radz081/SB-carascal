@@ -1,0 +1,196 @@
+<form id="form_registration">
+	
+<div class="container">
+	<div class="card shadow-lg border-0 rounded-4">
+	  <div class="card-body">
+		<h4 class="text-center mb-4 fw-bold text-primary">Personal Information</h4>
+  
+		<input type="hidden" id="info_id" name="info_id" value="0">
+  
+		<!-- Photo Upload Section -->
+		<div class="text-center mb-4">
+		  <img id="info_photo" 
+			   onerror="this.src='../static/icon/user.png'" 
+			   class="rounded-circle shadow-sm mb-3" 
+			   style="height: 130px; width: 130px; object-fit: cover;">
+		  <div>
+			<label for="file_photo" class="form-label fw-semibold">Upload Photo</label>
+			<input type="file" 
+				   class="form-control w-50 mx-auto" 
+				   onchange="readURL(this,'info_photo');"  
+				   id="file_photo" 
+				   name="file_photo"  
+				   accept="image/x-png,image/gif,image/jpeg,image/jpg" />
+		  </div>
+		</div>
+  
+		<!-- Full Name Section -->
+		<div class="mb-3">
+		  <label class="form-label fw-semibold">Full Name</label>
+		  <div class="row g-2">
+			<div class="col-sm-4">
+			  <input type="text" id="fname" name="fname" required placeholder="First Name" class="form-control">
+			</div>
+			<div class="col-sm-3">
+			  <input type="text" id="mname" name="mname" placeholder="Middle Name" class="form-control">
+			</div>
+			<div class="col-sm-3">
+			  <input type="text" id="lname" name="lname" required placeholder="Last Name" class="form-control">
+			</div>
+			<div class="col-sm-2">
+			  <input type="text" id="ename" name="ename" placeholder="Ext" class="form-control">
+			</div>
+		  </div>
+		</div>
+  
+		<!-- Address -->
+		<div class="mb-3">
+		  <label for="address" class="form-label fw-semibold">Address</label>
+		  <input type="text" id="address" name="address" class="form-control" placeholder="Enter address">
+		</div>
+  
+		<!-- Sex -->
+		<div class="mb-3">
+		  <label for="sex" class="form-label fw-semibold">Sex</label>
+		  <select id="sex" name="sex" class="form-select" required>
+			<option selected disabled value="">Select sex</option>
+			<option value="male">Male</option>
+			<option value="female">Female</option>
+		  </select>
+		</div>
+  
+		<!-- Email -->
+		<div class="mb-3">
+		  <label for="email" class="form-label fw-semibold">Email</label>
+		  <input type="email" id="email" name="email" class="form-control" placeholder="Enter email">
+		</div>
+  
+		<!-- Phone -->
+		<div class="mb-3">
+		  <label for="phone" class="form-label fw-semibold">Phone Number</label>
+		  <input type="text" id="phone" name="phone" class="form-control" placeholder="Enter phone number">
+		</div>
+  
+		<!-- Date of Birth -->
+		<div class="mb-3">
+		  <label for="date_of_birth" class="form-label fw-semibold">Date of Birth</label>
+		  <input type="date" id="date_of_birth" name="date_of_birth" class="form-control">
+		</div>
+  
+		<!-- About -->
+		<div class="mb-4">
+		  <label for="about" class="form-label fw-semibold">About</label>
+		  <textarea id="about" name="about" class="form-control" rows="3" placeholder="Tell us something about yourself"></textarea>
+		</div>
+  
+		<!-- Buttons -->
+		<div class="text-center mt-4">
+		  <button type="submit" class="btn btn-success px-4 me-2">
+			<i class="bi bi-save"></i> Save
+		  </button>
+		  <button type="button" class="btn btn-danger px-4" onclick="del_accounts()">
+			<i class="bi bi-trash"></i> Delete
+		  </button>
+		</div>
+	  </div>
+	</div>
+  </div>
+</form>
+
+
+<script type="text/javascript">
+	$(document).ready(function(){
+		var form_id='#form_registration'
+		 $(form_id).submit(function(e){
+		 	// var form_save = $(form_id).serializeObject();
+		 	var mydata = new FormData();
+
+		 	mydata.append("info_id", getbyId('info_id').value)
+		 	mydata.append("fname", getbyId('fname').value)
+		 	mydata.append("mname", getbyId('mname').value)
+		 	mydata.append("lname", getbyId('lname').value)
+		 	mydata.append("ename", getbyId('ename').value)
+		 	mydata.append("address", getbyId('address').value)
+		 	mydata.append("about", getbyId('about').value)
+		 	mydata.append("email", getbyId('email').value)
+		 	mydata.append("phone", getbyId('phone').value)
+			 mydata.append("sex", getbyId('sex').value)
+		 	mydata.append("date_of_birth", getbyId('date_of_birth').value)
+
+		 	jQuery.each($("#file_photo")[0].files, function(i, file) {
+		        mydata.append('photo['+i+']', file);
+		    })
+
+	        e.preventDefault();
+	        swal.fire({
+				title: "Are you sure want to save?",
+				text: "Click ok to continue",
+				type: "info",
+				showCancelButton: true,
+				showLoaderOnConfirm: true,
+				preConfirm: () => {
+					return fetch(console.log("log"))
+					.then(
+						 $.ajax({
+					        type: 'POST',
+					        url: "/save_personal_info",
+					        contentType:false,
+					        processData:false,
+					        cache: false,
+					        data:mydata,
+					        beforeSend: function() {
+						       console.log(mydata)
+						    },
+					        success: function(res) {
+								$('#div_accounts_modal').modal('toggle');
+								load_tbl_personal_info()
+								saved(res)
+					        },
+					        error: function() {
+					            error_in_saving("error occured");
+					        }
+					    })
+					)
+					.catch(() => {
+					    Swal.fire({
+					      icon: 'error',
+					      title: 'Error occured'
+					    })
+					})
+				}
+			})
+	    })
+	})
+
+	function del_accounts(){
+		var data={
+			info_id:getbyId('info_id').value
+		}
+		Swal.fire({
+			title: 'Are you sure?',
+			text: "You won't be able to revert this!",
+			icon: 'warning',
+			showCancelButton: true,
+			confirmButtonColor: '#d33',
+			cancelButtonColor: '#3085d6',
+			confirmButtonText: 'Yes, delete it!',
+			customClass: 'swal_css',
+		}).then((result) => {
+			if (result.isConfirmed) {
+				Swal.fire(
+				  'Deleted!',
+				  'Your file has been deleted.',
+				  'success'
+				)
+				
+				sendDataWithCallback('/delete_accounts',data,function(res){
+					if(res){
+						$('#tbl_personal_info').DataTable().destroy();
+						load_tbl_personal_info()
+						$('#div_accounts_modal').modal('toggle')
+					}
+				})
+			}
+		})
+	}
+</script>
