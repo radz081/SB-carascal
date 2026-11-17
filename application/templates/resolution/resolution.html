@@ -104,9 +104,6 @@
 				       	getbyId('h_legislature_res').value=""
 				       	getbyId('h_committee_id_res').value=""
 
-				       	getbyId('div_resolution_author').innerHTML=""
-				       	getbyId('div_resolution_co_author').innerHTML=""
-				       	getbyId('div_resolution_sponsor').innerHTML=""
 
 				       	$('#sel_ordinance_category_res').val('').trigger('chosen:updated')
 
@@ -155,41 +152,6 @@
 			}
 			
 			load_resolution_minutes_file(min_data)
-		})
-	}
-
-	function delete_resolution_minutes(elem){
-		var tr = $(elem).closest('tr');
-		var dataArr = $('#tbl_cb').DataTable().row(tr).data()
-		var data={
-			minutes_res_id:elem.getAttribute('data-minutes_res_id'),
-			minutes_id:elem.getAttribute('data-minutes_id')
-		}
-		Swal.fire({
-			title: 'Are you sure?',
-			text: "You won't be able to revert this!",
-			icon: 'warning',
-			showCancelButton: true,
-			confirmButtonColor: '#d33',
-			cancelButtonColor: '#3085d6',
-			confirmButtonText: 'Yes, delete it!',
-			customClass: 'swal_css',
-		}).then((result) => {
-			if (result.isConfirmed) {
-				sendDataWithCallback('/delete_resolution_minutes_file',data,function(res){
-					if(res){
-						if ($.fn.DataTable.isDataTable('#tbl_add_minutes_file_resolution')) {
-				        	$('#tbl_add_minutes_file_resolution').DataTable().clear().draw();
-				       	}
-				       	load_resolution_minutes_file(data)
-						Swal.fire(
-						  'Deleted!',
-						  'Your file has been deleted.',
-						  'success'
-						)
-					}
-				})
-			}
 		})
 	}
 

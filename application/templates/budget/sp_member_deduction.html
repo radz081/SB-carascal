@@ -1,48 +1,52 @@
-<div class="colfull">
-    <h3>SP BUDGET EXPENSES/DEDUCTIONS</h3>
-    <div class="colfull">
-        <div class="col20">
-            <p>SELECT SANGUNIAN</p>
+<div class="col-sm-12">
+    <div class="card">
+        <div class="card-header d-flex justify-content-between">
+            <div class="header-title">
+                <h4 class="card-title">SP BUDGET EXPENSES/DEDUCTIONS</h4>
+            </div>
         </div>
-        <div class="col30">
-            <select class="form-control chosen-select" name="inp_sp_id_deduction" id="inp_sp_id_deduction"></select>
-            <!-- <input type="search"  class="form-control" placeholder="--SELECT--" list="datalist_sp_mem_deduction" autocomplete="off"> -->
-            <!-- <datalist id="datalist_sp_mem_deduction"></datalist> -->
+        <div class="card-body">
+            <div class="row align-items-center mb-4">
+                <div class="col-md-3">
+                    <label class="form-label fw-bold mb-0" for="inp_sp_id_deduction">SELECT SANGGUNIAN</label>
+                </div>
+                <div class="col-md-5">
+                    <select class="form-select" style="width:100%" name="inp_sp_id_deduction" id="inp_sp_id_deduction"></select>
+                </div>
+            </div>
+            <div class="table-responsive">
+                <table id="tbl_sp_budget_member_deduction" class="table table-bordered table-hover" style="width:100%;">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Id</th>
+                            <th>Name</th>
+                            <th class="text-end">Allocated</th>
+                            <th class="text-end">Deduction</th>
+                            <th class="text-end">Remaining</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbody_sp_budget_deduction" style="background-color: white">
+                        <tr>
+                            <td colspan="5" align="center">Select a Sanggunian to view member deductions</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
-    </div>
-    <div class="colfull" style="margin-top: 40px;">
-        <table id="tbl_sp_budget_member_deduction" class="table" style="width:100%;border-collapse: collapse;" border="1">
-            <thead>
-                <tr>
-                    <th>Id</th>
-                    <th>Name</th>
-                    <th>Allocated</th>
-                    <th>Deduction</th>
-                    <th>Remaining</th>
-                </tr>
-            </thead>
-            <tbody id="tbody_sp_budget_deduction" style="background-color: white">
-               <tr>
-                    <td colspan="5" align="center">No data available</td>
-               </tr>
-            </tbody>
-        </table>
     </div>
 </div>
 <script type="text/javascript">
     $(document).ready(function(res){
 
         getDataWithCallback('/get_sp',function(res){
-            $('#inp_sp_id_deduction').chosen({width:"100%"})
             $('#inp_sp_id_deduction').append(`<option value="" disabled selected> ${'--SELECT--'} </option>`);
             for(var x=0; x<res.length; x++){
                 $('#inp_sp_id_deduction').append(`<option value="${res[x].sp_id}"> ${res[x].sp_title} </option>`);
             }
 
-            $('#inp_sp_id_deduction').trigger("chosen:updated")
         })
 
-        $("#inp_sp_id_deduction").chosen().change(function(){
+        $("#inp_sp_id_deduction").on("change", function(){
             var id = $(this).val();
             get_data_mem_deduction(id)
         });
@@ -70,6 +74,9 @@
         sendDataWithCallback('/get_sp_member_deduction',data,function(res){
             var tbody=getbyId('tbody_sp_budget_deduction')
 
+            if(!res.length){
+                tbody.innerHTML='<tr><td colspan="5" align="center">No data available</td></tr>'
+            }
             for(var y=0; y<res.length;y++){
                 var tr1=document.createElement('tr')
 
@@ -81,9 +88,9 @@
 
                 td_0.innerHTML=res[y].balance_id;
                 td_1.innerHTML=res[y].fullname;
-                td_2.innerHTML=res[y].allocation;
-                td_3.innerHTML=res[y].total_deduction;
-                td_4.innerHTML=res[y].remaining;
+                td_2.innerHTML=res[y].allocation; td_2.className='text-end';
+                td_3.innerHTML=res[y].total_deduction; td_3.className='text-end';
+                td_4.innerHTML=res[y].remaining; td_4.className='text-end';
 
                 tr1.appendChild(td_0)
                 tr1.appendChild(td_1)
@@ -256,17 +263,10 @@
                     sendDataWithCallback('/get_sp_mem_remaining_bal',data,function(res){
                         getbyId('remaining_bal_deduction_details').value=parseFloat(res[0].remaining_balance)-parseFloat(res[0].deduction)
                         var inp_sp_id_deduction=getbyId('inp_sp_id_deduction');
-                        datalist_sp_mem_deduction=getbyId('datalist_sp_mem_deduction');
                         val=inp_sp_id_deduction.value;
                         if (val != "") {
-                            for(var t=0; t<datalist_sp_mem_deduction.options.length; t++){
-                                if (val == datalist_sp_mem_deduction.options[t].value) {
-                                    var data=datalist_sp_mem_deduction.options[t].getAttribute('data-id')
-                                    getbyId('tbody_sp_budget_deduction').innerHTML=""
-                                    get_data_mem_deduction(data)
-                                    saved(res)
-                                }
-                            }
+                            getbyId('tbody_sp_budget_deduction').innerHTML=""
+                            get_data_mem_deduction(val)
                         }
                          Swal.fire(
                           'Deleted!',

@@ -1,26 +1,4 @@
 // var data_url= "192.168.3.10:1000"
-function sendDataWithCallbackbtn(url, data, btn, callback) {
-    $.ajax({
-        type: 'POST',
-        url: url,
-        data: JSON.stringify(data),
-        contentType: "application/json",
-        dataType: 'json',
-        beforeSend: function() {
-            console.log("sending");
-        },
-        complete: function() {
-            console.log("done sending");
-        },
-        success: function(data) {
-            callback(data)
-        },
-        error: function() {
-            error_in_saving("error occured in sending to " + url);
-        }
-    });
-}
-
 
 function getDataWithCallback(url, callback) {
     $.ajax({
@@ -105,33 +83,6 @@ function recalc_table_withdata(tbl, cols, datas) {
         });
         resolve(table);
     })
-}
-
-function loadDataIntable(tbl, col, data, modal) {
-    if ($.fn.DataTable.isDataTable('#'+tbl)) {
-        $('#'+tbl).DataTable().destroy();
-    }
-    var table = $('#' + tbl).DataTable({
-        data: data,
-        responsive: true,
-        dom: 'Bfrtip',
-        columns: col,
-        buttons: [{
-            text: 'Add New',
-            action: function(e, dt, node, config) {
-                getbyId('btn_del_session').style.display = "none";
-            },
-            'className': 'btn btn-success'
-        },{
-            extend: 'print',
-            text: 'Print',
-            filename: 'file',
-            title: 'Print',
-            titleAttr: 'Print'
-            ,'className': 'btn btn-warning'
-                    } ],
-        "pagingType": "full_numbers",
-    });
 }
 
 var byId = function( id ) { return document.getElementById( id ); };

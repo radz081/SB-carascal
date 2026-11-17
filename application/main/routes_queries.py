@@ -1,15 +1,12 @@
 
-from flask import redirect, url_for, request , jsonify, json, session ,current_app as app, render_template
+from flask import redirect, url_for, request, jsonify, json, session, current_app as app, render_template
 from . import *
 from flask_uploads import UploadSet, configure_uploads, IMAGES
 from models.routes_database import *
 import shutil
 from pathlib import Path, PurePath
-import ast
 from datetime import datetime
-
 from functools import wraps
-from flask import session, jsonify
 
 query=main
 CORS(query)
@@ -44,79 +41,112 @@ def login_required(f):
 @login_required
 def save_personal_info():
 	p=request.form
-	if p['info_id']==0 or p['info_id']=="0":
-		insert="""
-			insert into tbl_personal_info set f_name='"""+str(p['fname'].title())+"""',m_name='"""+str(p['mname'].title())+"""',
-			l_name='"""+str(p['lname'].title())+"""',ename='"""+str(p['ename'].title())+"""', address='"""+str(p['address'].title())+"""',about='"""+str(p['about'])+"""',email='"""+str(p['email'])+"""',
-			phone='"""+str(p['phone'])+"""',dob='"""+str(p['date_of_birth'])+"""', sex='"""+str(p['sex'])+"""'
+	info_id = validate_int(p.get('info_id', 0))
+	
+	# Validate and sanitize inputs
+	fname = validate_string(p.get('fname', ''), 100).title()
+	mname = validate_string(p.get('mname', ''), 100).title()
+	lname = validate_string(p.get('lname', ''), 100).title()
+	ename = validate_string(p.get('ename', ''), 50).title()
+	address = validate_string(p.get('address', ''), 255).title()
+	about = validate_string(p.get('about', ''), 1000)
+	email = validate_string(p.get('email', ''), 100)
+	phone = validate_string(p.get('phone', ''), 20)
+	dob = validate_string(p.get('date_of_birth', ''), 20)
+	sex = validate_string(p.get('sex', ''), 10)
+	
+	# Validate email format
+	if email and not validate_email(email):
+		return jsonify({"error": "Invalid email format"}), 400
+	
+	if info_id == 0:
+		# INSERT with parameterized query
+		insert = """
+			INSERT INTO tbl_personal_info (f_name, m_name, l_name, ename, address, about, email, phone, dob, sex)
+			VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
 		"""
-		rd=cud_callbackid(insert)
+		params = (fname, mname, lname, ename, address, about, email, phone, dob, sex)
+		rd = cud_callbackid_safe(insert, params)
+		
+		if not rd:
+			return jsonify({"error": "Failed to save personal info"}), 500
+			
+		# Handle file upload
 		for filename_array in request.files:
-			file=request.files[filename_array]
+			file = request.files[filename_array]
 			
 			n_path = Path(__file__).parent / "../static/uploads/emp_photo" / str(rd)
 			n_path.resolve()
 
 			if file and allowed_file(file.filename):
-				filename = str(custom_secure_filename(file.filename)).replace("'","''")
+				filename = str(custom_secure_filename(file.filename))
 				if not os.path.exists(n_path):
 					os.mkdir(n_path)
-					app.config['UPLOAD_FOLDER']=n_path
+					app.config['UPLOAD_FOLDER'] = n_path
 					file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
 				else:
-					app.config['UPLOAD_FOLDER']=n_path
+					app.config['UPLOAD_FOLDER'] = n_path
 					file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
 					
-				location1="emp_photo//"+str(rd)
-				location1.replace("//", "\\\\");
-				location=location1+"/"+filename
-				path_location=location.replace("/", "\\\\");
+				location1 = "emp_photo//" + str(rd)
+				location1.replace("//", "\\\\")
+				location = location1 + "/" + filename
+				path_location = location.replace("/", "\\\\")
 
-				update="update tbl_personal_info set img='"+str(path_location)+"' where info_id='"+str(rd)+"'"
-				cud(update)
-		return jsonify("Succesfuly saved")
+				update = "UPDATE tbl_personal_info SET img=%s WHERE info_id=%s"
+				cud_safe(update, (path_location, rd))
+		
+		return jsonify("Successfully saved")
 	else:
-		update="""
-			update tbl_personal_info set f_name='"""+str(p['fname'].title())+"""',m_name='"""+str(p['mname'].title())+"""',
-			l_name='"""+str(p['lname'].title())+"""',ename='"""+str(p['ename'].title())+"""', address='"""+str(p['address'].title())+"""',about='"""+str(p['about'])+"""',email='"""+str(p['email'])+"""',
-			phone='"""+str(p['phone'])+"""',dob='"""+str(p['date_of_birth'])+"""', sex='"""+str(p['sex'])+"""' where info_id='"""+str(p['info_id'])+"""'
+		# UPDATE with parameterized query
+		update = """
+			UPDATE tbl_personal_info 
+			SET f_name=%s, m_name=%s, l_name=%s, ename=%s, address=%s, about=%s, 
+			    email=%s, phone=%s, dob=%s, sex=%s
+			WHERE info_id=%s
 		"""
-		cud(update)
+		params = (fname, mname, lname, ename, address, about, email, phone, dob, sex, info_id)
+		cud_safe(update, params)
+		
+		# Handle file upload
 		for filename_array in request.files:
-			file=request.files[filename_array]
+			file = request.files[filename_array]
 			
-			n_path = Path(__file__).parent / "../static/uploads/emp_photo" / str(p['info_id'])
+			n_path = Path(__file__).parent / "../static/uploads/emp_photo" / str(info_id)
 			n_path.resolve()
 
 			if file and allowed_file(file.filename):
-				filename = str(custom_secure_filename(file.filename)).replace("'","''")
+				filename = str(custom_secure_filename(file.filename))
 				if not os.path.exists(n_path):
 					os.mkdir(n_path)
-					app.config['UPLOAD_FOLDER']=n_path
+					app.config['UPLOAD_FOLDER'] = n_path
 					file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
 				else:
-					app.config['UPLOAD_FOLDER']=n_path
+					app.config['UPLOAD_FOLDER'] = n_path
 					file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
 					
-				location1="emp_photo//"+str(p['info_id'])
-				location1.replace("//", "\\\\");
-				location=location1+"/"+filename
-				path_location=location.replace("/", "\\\\");
+				location1 = "emp_photo//" + str(info_id)
+				location1.replace("//", "\\\\")
+				location = location1 + "/" + filename
+				path_location = location.replace("/", "\\\\")
 
-				update1="update tbl_personal_info set img='"+str(path_location)+"' where info_id='"+str(p['info_id'])+"'"
-				cud(update1)
-		return jsonify("Succesfully Updated")
+				update1 = "UPDATE tbl_personal_info SET img=%s WHERE info_id=%s"
+				cud_safe(update1, (path_location, info_id))
+		
+		return jsonify("Successfully Updated")
 
 
 @query.route('/get_personal_info', methods=['GET', 'POST'])
 @login_required
 def get_personal_info():
-	p=json.loads(request.data)
-	sel="""
-		select * from tbl_personal_info
-		where info_id='"""+str(p['info_id'])+"""'
-	"""
-	rd=pyread(sel)
+	p = json.loads(request.data)
+	info_id = validate_int(p.get('info_id', 0))
+	
+	if info_id <= 0:
+		return jsonify({"error": "Invalid info_id"}), 400
+	
+	sel = "SELECT * FROM tbl_personal_info WHERE info_id=%s"
+	rd = pyread_safe(sel, (info_id,))
 	return jsonify(rd)
 
 @query.route('/get_info', methods=['GET', 'POST'])
@@ -165,8 +195,9 @@ def get_sp_budget():
 @login_required
 def get_sp_data():
 	p=json.loads(request.data)
-	sel="select sp_id from tbl_sp_budget where sp_budget_id='"+str(p['sp_budget_id'])+"'"
-	rd=pyread(sel)
+	sel="""select sp_id from tbl_sp_budget where sp_budget_id=%s"""
+	sel_params = [str(p['sp_budget_id'])]
+	rd=pyread_safe(sel, sel_params)
 	select="""
 		select *, concat(tpi_mayor.f_name,' ',tpi_mayor.m_name,' ',tpi_mayor.l_name) mayor_fullname,tsbb.allocation mayor_allocation,tsbb.balance_id mayor_balance_id,
 		concat(tpi_vmayor.f_name,' ',tpi_vmayor.m_name,' ',tpi_vmayor.l_name) vmayor_fullname,tsbb2.allocation vmayor_allocation,tsbb2.balance_id vmayor_balance_id,
@@ -186,9 +217,10 @@ def get_sp_data():
 
 		left join tbl_sp_budget_balance tsbb4 on tsbb4.info_id=sc.councilor
 
-		where ts.sp_id='"""+str(rd[0]['sp_id'])+"""' group by sc.sp_councilor
+		where ts.sp_id=%s group by sc.sp_councilor
 	"""
-	rd=pyread(select)
+	select_params = [str(rd[0]['sp_id'])]
+	rd=pyread_safe(select, select_params)
 	return jsonify(rd)
 
 @query.route('/sel_personal_info', methods=['GET', 'POST'])
@@ -202,21 +234,24 @@ def sel_personal_info():
 @login_required
 def save_sp():
 	p=request.form
-	title=p['title'].replace("'","''")
+	title=p['title']
 
 	p=json.loads(p['Serialized'])
 	year_range = p['sp_year'] +'-' +p['sp_year2']
 
 	if p['sp_id']==0 or p['sp_id']=="0":
-		insert_sp="insert into tbl_sp set sp_year='"+str(year_range)+"', sp_title='"+str(title)+"'"
-		r_id=cud_callbackid(insert_sp)
+		insert_sp="""insert into tbl_sp set sp_year=%s, sp_title=%s"""
+		insert_sp_params = [str(year_range), str(title)]
+		r_id=cud_callbackid_safe(insert_sp, insert_sp_params)
 
-		insert_sp_member="insert into sp_member set sp_vice_mayor='"+str(p['vmayor'])+"', sp_secretary='"+str(p['secretary'])+"', sp_id='"+str(r_id)+"'"
-		r_id2=cud_callbackid(insert_sp_member)
+		insert_sp_member="""insert into sp_member set sp_vice_mayor=%s, sp_secretary=%s, sp_id=%s"""
+		insert_sp_member_params = [str(p['vmayor']), str(p['secretary']), str(r_id)]
+		r_id2=cud_callbackid_safe(insert_sp_member, insert_sp_member_params)
 		
 		for n in p['council_name']:
-			insert_sp_councilor="insert into sp_councilor set councilor='"+str(n['council_name'])+"', sp_member_id='"+str(r_id2)+"'"
-			cud(insert_sp_councilor)
+			insert_sp_councilor="""insert into sp_councilor set councilor=%s, sp_member_id=%s"""
+			insert_sp_councilor_params = [str(n['council_name']), str(r_id2)]
+			cud_safe(insert_sp_councilor, insert_sp_councilor_params)
 
 		x=-1
 		y=-1
@@ -245,8 +280,9 @@ def save_sp():
 					location=location1+"/"+filename
 					path_location=location.replace("/", "\\\\");
 
-					update_sp="update tbl_sp set sp_logo='"+str(path_location)+"' where sp_id='"+str(r_id)+"'"
-					cud(update_sp)
+					update_sp="""update tbl_sp set sp_logo=%s where sp_id=%s"""
+					update_sp_params = [str(path_location), str(r_id)]
+					cud_safe(update_sp, update_sp_params)
 
 
 			if str(split[0])=="citylogo":
@@ -272,31 +308,37 @@ def save_sp():
 					location=location1+"/"+filename
 					path_location=location.replace("/", "\\\\");
 
-					update_sp="update tbl_sp set city_logo='"+str(path_location)+"' where sp_id='"+str(r_id)+"'"
-					cud(update_sp)
+					update_sp="""update tbl_sp set city_logo=%s where sp_id=%s"""
+					update_sp_params = [str(path_location), str(r_id)]
+					cud_safe(update_sp, update_sp_params)
 
 		return jsonify('Succesfuly saved')
 	else:
 		update_sp="""
-			update tbl_sp set sp_year='"""+str(year_range)+"""', sp_title='"""+str(title)+"""' where sp_id='"""+str(p['sp_id'])+"""'
+			update tbl_sp set sp_year=%s, sp_title=%s where sp_id=%s
 		"""
-		cud(update_sp)
+		update_sp_params = [str(year_range), str(title), str(p['sp_id'])]
+		cud_safe(update_sp, update_sp_params)
 
 		update_sp_member="""
-			update sp_member set sp_vice_mayor='"""+str(p['vmayor'])+"""', 
-			sp_secretary='"""+str(p['secretary'])+"""' where sp_id='"""+str(p['sp_id'])+"""'
+			update sp_member set sp_vice_mayor=%s, 
+			sp_secretary=%s where sp_id=%s
 		"""
-		cud(update_sp_member)
+		update_sp_member_params = [str(p['vmayor']), str(p['secretary']), str(p['sp_id'])]
+		cud_safe(update_sp_member, update_sp_member_params)
 
-		select="select sp_member_id from sp_member where sp_id='"+str(p['sp_id'])+"'"
-		rd=pyread(select)
+		select="""select sp_member_id from sp_member where sp_id=%s"""
+		select_params = [str(p['sp_id'])]
+		rd=pyread_safe(select, select_params)
 
-		delete="delete from sp_councilor where sp_member_id='"+str(rd[0]['sp_member_id'])+"'"
-		cud(delete)
+		delete="""delete from sp_councilor where sp_member_id=%s"""
+		delete_params = [str(rd[0]['sp_member_id'])]
+		cud_safe(delete, delete_params)
 
 		for n in p['council_name']:
-			insert_sp_councilor="insert into sp_councilor set councilor='"+str(n['council_name'])+"', sp_member_id='"+str(rd[0]['sp_member_id'])+"'"
-			cud(insert_sp_councilor)
+			insert_sp_councilor="""insert into sp_councilor set councilor=%s, sp_member_id=%s"""
+			insert_sp_councilor_params = [str(n['council_name']), str(rd[0]['sp_member_id'])]
+			cud_safe(insert_sp_councilor, insert_sp_councilor_params)
 
 		x=-1
 		y=-1
@@ -326,8 +368,9 @@ def save_sp():
 					location=location1+"/"+filename
 					path_location=location.replace("/", "\\\\");
 
-					update_sp="update tbl_sp set sp_logo='"+str(path_location)+"' where sp_id='"+str(p['sp_id'])+"'"
-					cud(update_sp)
+					update_sp="""update tbl_sp set sp_logo=%s where sp_id=%s"""
+					update_sp_params = [str(path_location), str(p['sp_id'])]
+					cud_safe(update_sp, update_sp_params)
 
 
 			if str(split[0])=="citylogo":
@@ -353,17 +396,23 @@ def save_sp():
 					location=location1+"/"+filename
 					path_location=location.replace("/", "\\\\");
 
-					update_sp="update tbl_sp set city_logo='"+str(path_location)+"' where sp_id='"+str(p['sp_id'])+"'"
-					cud(update_sp)
+					update_sp="""update tbl_sp set city_logo=%s where sp_id=%s"""
+					update_sp_params = [str(path_location), str(p['sp_id'])]
+					cud_safe(update_sp, update_sp_params)
 		return jsonify("Succesfuly Updated")
 
 @query.route('/del_sp', methods=['GET', 'POST'])
 @login_required
 def del_sp():
-	p=json.loads(request.data)
-	delete="delete from tbl_sp where sp_id='"+str(p['sp_id'])+"'"
-	cud(delete)
-	return jsonify('Succesfuly Deleted')
+	p = json.loads(request.data)
+	sp_id = validate_int(p.get('sp_id', 0))
+	
+	if sp_id <= 0:
+		return jsonify({"error": "Invalid sp_id"}), 400
+	
+	delete = "DELETE FROM tbl_sp WHERE sp_id=%s"
+	cud_safe(delete, (sp_id,))
+	return jsonify('Successfully Deleted')
 
 @query.route('/get_sp_member', methods=['GET', 'POST'])
 @login_required
@@ -392,9 +441,10 @@ def get_sp_member():
 					LEFT JOIN tbl_personal_info tpi_vmyr ON tpi_vmyr.info_id = sm.sp_vice_mayor 
 					LEFT JOIN tbl_personal_info tpi_sec ON tpi_sec .info_id = sm.sp_secretary
 					where 
-						ts.sp_id ='"""+str(p['sp_id'])+"""'
+						ts.sp_id =%s
 			"""
-		rd = pyread(select)
+		select_params = [str(p['sp_id'])]
+		rd = pyread_safe(select, select_params)
 
 		sel = """SELECT
 					*,
@@ -404,9 +454,10 @@ def get_sp_member():
 					LEFT JOIN sp_member sm ON sc.sp_member_id = sm.sp_member_id
 					LEFT JOIN tbl_personal_info tpi ON tpi.info_id = sc.councilor 
 				WHERE
-					sc.sp_member_id =  '"""+str(rd[0]['sp_member_id'])+"""' 
+					sc.sp_member_id =  %s 
 			"""
-		res = pyread(sel)
+		sel_params = [str(rd[0]['sp_member_id'])]
+		res = pyread_safe(sel, sel_params)
 
 		rd[0]['councilors'] = res
 
@@ -440,10 +491,11 @@ def get_sp_member_deduction():
 			
 			left join tbl_sp_budget_balance_expenses tsbbe on tsbbe.balance_id=tsbb.balance_id
 
-			where ts.sp_id='"""+str(p['sp_id'])+"""'
+			where ts.sp_id=%s
 			group by tsbb.balance_id
 		"""
-	rd=pyread(select)
+	select_params = [str(p['sp_id'])]
+	rd=pyread_safe(select, select_params)
 	return jsonify(rd)
 
 @query.route('/get_committee', methods=['GET', 'POST'])
@@ -461,9 +513,10 @@ def get_committee():
 def get_committeeBySp():
 	p=json.loads(request.data)
 	select="""
-		select * from tbl_committee where sp_id='"""+str(p['sp_id'])+"""'
+		select * from tbl_committee where sp_id=%s
 	"""
-	rd=pyread(select)
+	select_params = [str(p['sp_id'])]
+	rd=pyread_safe(select, select_params)
 	return jsonify(rd)
 
 
@@ -473,10 +526,11 @@ def get_committee_petition_minutes_file():
 	p=json.loads(request.data)
 	select="""
 			select * from tbl_minutes_path_committee_petition 
-			where petition_id='"""+str(p['petition_id'])+"""' 
-			and committee_id='"""+str(p['committee_id'])+"""'
+			where petition_id=%s 
+			and committee_id=%s
 		"""
-	rd=pyread(select)
+	select_params = [str(p['petition_id']), str(p['committee_id'])]
+	rd=pyread_safe(select, select_params)
 	return jsonify(rd)
 
 
@@ -488,32 +542,38 @@ def get_committee_member():
 			select *,concat(tpi.f_name,' ',tpi.m_name,' ',tpi.l_name) fullname from tbl_committee tc
 			left join tbl_committee_members tcm on tcm.committee_id=tc.committee_id
 			left join tbl_personal_info tpi on tpi.info_id =tcm.committee_members
-			where tc.committee_id='"""+str(p['committee_id'])+"""'
+			where tc.committee_id=%s
 		"""
-	rd=pyread(select)
+	select_params = [str(p['committee_id'])]
+	rd=pyread_safe(select, select_params)
 	return jsonify(rd)
 
 @query.route('/save_sp_budget', methods=['GET', 'POST'])
 @login_required
 def save_sp_budget():
 	p=json.loads(request.data)
-	insert="insert into tbl_sp_budget set sp_id='"+str(p['sp_id'])+"', budget_year='"+str(p['year'])+"' "
-	rd=cud_callbackid(insert)
-	sel="select * from sp_member where sp_id='"+str(p['sp_id'])+"'"
-	s_rd=pyread(sel)
+	insert="""insert into tbl_sp_budget set sp_id=%s, budget_year=%s """
+	insert_params = [str(p['sp_id']), str(p['year'])]
+	rd=cud_callbackid_safe(insert, insert_params)
+	sel="""select * from sp_member where sp_id=%s"""
+	sel_params = [str(p['sp_id'])]
+	s_rd=pyread_safe(sel, sel_params)
 
 	member_arr=[s_rd[0]['sp_mayor'],s_rd[0]['sp_vice_mayor'],s_rd[0]['sp_secretary']]
 
 	for i in range(len(member_arr)):
 		if member_arr[i]:
-			insert_member="insert into tbl_sp_budget_balance set info_id='"+str(member_arr[i])+"' , allocation=0,expenses=0, balance=0, sp_budget_id='"+str(rd)+"'"
-			cud(insert_member)
+			insert_member="""insert into tbl_sp_budget_balance set info_id=%s , allocation=0,expenses=0, balance=0, sp_budget_id=%s"""
+			insert_member_params = [str(member_arr[i]), str(rd)]
+			cud_safe(insert_member, insert_member_params)
 
-	sel_counc="select * from sp_councilor where sp_member_id='"+str(s_rd[0]['sp_member_id'])+"'"
-	sc_rd=pyread(sel_counc)
+	sel_counc="""select * from sp_councilor where sp_member_id=%s"""
+	sel_counc_params = [str(s_rd[0]['sp_member_id'])]
+	sc_rd=pyread_safe(sel_counc, sel_counc_params)
 	for x in range(len(sc_rd)):
-		insert_member="insert into tbl_sp_budget_balance set info_id='"+str(sc_rd[x]['councilor'])+"' , allocation=0,expenses=0, balance=0, sp_budget_id='"+str(rd)+"'"
-		cud(insert_member)
+		insert_member="""insert into tbl_sp_budget_balance set info_id=%s , allocation=0,expenses=0, balance=0, sp_budget_id=%s"""
+		insert_member_params = [str(sc_rd[x]['councilor']), str(rd)]
+		cud_safe(insert_member, insert_member_params)
 	return jsonify("Succesfuly Saved")
 
 
@@ -521,8 +581,9 @@ def save_sp_budget():
 @login_required
 def update_sp_budget_year():
 	p=json.loads(request.data)
-	upd="update tbl_sp_budget set budget_year='"+str(p['budget_year'])+"' where sp_budget_id='"+str(p['sp_buget_id'])+"'"
-	cud(upd)
+	upd="""update tbl_sp_budget set budget_year=%s where sp_budget_id=%s"""
+	upd_params = [str(p['budget_year']), str(p['sp_buget_id'])]
+	cud_safe(upd, upd_params)
 	return jsonify("Succesfuly Updated")
 
 
@@ -535,9 +596,10 @@ def get_committee_co_chair():
 		select *,concat(tpi.f_name,' ',tpi.m_name,' ',l_name) as co_chairman_fullname 
 		from tbl_committee tc
 		left join tbl_personal_info tpi on tpi.info_id=tc.co_chairman
-		where committee_id='"""+str(p['committee_id'])+"""'
+		where committee_id=%s
 	"""
-	rd=pyread(sel)
+	sel_params = [str(p['committee_id'])]
+	rd=pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 
@@ -546,31 +608,37 @@ def get_committee_co_chair():
 def save_committee():
 	p=json.loads(request.data)
 	if p['committee_id']==0 or p['committee_id']=="0":
-		insert="insert into tbl_committee set committee='"+str(p['committee_name'])+"', phone_no='"+str(p['phone'])+"', email='"+str(p['committee_email'])+"', chairman='"+str(p['committee_chair'])+"', co_chairman='"+str(p['co_chairman'])+"' , sp_id='"+str(p['sangunian_council'])+"'"
-		rd_id=cud_callbackid(insert)
+		insert="""insert into tbl_committee set committee=%s, phone_no=%s, email=%s, chairman=%s, co_chairman=%s , sp_id=%s"""
+		insert_params = [str(p['committee_name']), str(p['phone']), str(p['committee_email']), str(p['committee_chair']), str(p['co_chairman']), str(p['sangunian_council'])]
+		rd_id=cud_callbackid_safe(insert, insert_params)
 
 		if 'members' in p:
 			for n in p['members']:
-				insert_member="insert into tbl_committee_members set committee_members='"+str(n)+"', committee_id='"+str(rd_id)+"' "
-				cud(insert_member)
+				insert_member="""insert into tbl_committee_members set committee_members=%s, committee_id=%s """
+				insert_member_params = [str(n), str(rd_id)]
+				cud_safe(insert_member, insert_member_params)
 
 		return jsonify("Succesfuly Saved")
 	else:
 
-		update="update tbl_committee set committee='"+str(p['committee_name'])+"', phone_no='"+str(p['phone'])+"', email='"+str(p['committee_email'])+"', chairman='"+str(p['committee_chair'])+"', co_chairman='"+str(p['co_chairman'])+"', sp_id='"+str(p['sangunian_council'])+"'  where committee_id='"+str(p['committee_id'])+"'"
-		cud(update)
+		update="""update tbl_committee set committee=%s, phone_no=%s, email=%s, chairman=%s, co_chairman=%s, sp_id=%s  where committee_id=%s"""
+		update_params = [str(p['committee_name']), str(p['phone']), str(p['committee_email']), str(p['committee_chair']), str(p['co_chairman']), str(p['sangunian_council']), str(p['committee_id'])]
+		cud_safe(update, update_params)
 
-		delete="delete from tbl_committee_members where committee_id='"+str(p['committee_id'])+"'"
-		cud(delete)
+		delete="""delete from tbl_committee_members where committee_id=%s"""
+		delete_params = [str(p['committee_id'])]
+		cud_safe(delete, delete_params)
 
 		if 'members' in p:
 			for n in p['members']:
-				select="select count(*) counter from tbl_committee_members where committee_members='"+str(n)+"' and committee_id='"+str(p['committee_id'])+"'"
-				rd_if_exist=pyread(select)
+				select="""select count(*) counter from tbl_committee_members where committee_members=%s and committee_id=%s"""
+				select_params = [str(n), str(p['committee_id'])]
+				rd_if_exist=pyread_safe(select, select_params)
 
 				if rd_if_exist[0]['counter']==0 or rd_if_exist[0]['counter']=="0":
-					insert_member="insert into tbl_committee_members set committee_members='"+str(n)+"', committee_id='"+str(p['committee_id'])+"' "
-					cud(insert_member)
+					insert_member="""insert into tbl_committee_members set committee_members=%s, committee_id=%s """
+					insert_member_params = [str(n), str(p['committee_id'])]
+					cud_safe(insert_member, insert_member_params)
 
 		return jsonify("Succesfuly Updated")
 
@@ -596,9 +664,10 @@ def get_committee_ordinance():
 			END) stats_ordinance
 			 from tbl_ordinance tbo
 			 left join tbl_committee_ref_ordinance tcro on tcro.ordinance_id=tbo.ordinance_id
-		where tcro.committee_id='"""+str(p['committee_id'])+"""'
+		where tcro.committee_id=%s
 	"""
-	rd=pyread(sel)
+	sel_params = [str(p['committee_id'])]
+	rd=pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 @query.route('/delete_committee_ref_ordinance', methods=['GET', 'POST'])
@@ -607,17 +676,19 @@ def delete_committee_ref_ordinance():
 	p=json.loads(request.data)
 	sel="""
 		select count(*) counter from tbl_ordinance_file_committee 
-		where committee_id="""+str(p['committee_id'])+""" and ordinance_id="""+str(p['ordinance_id'])+"""
+		where committee_id=%s and ordinance_id=%s
 	"""
-	rd=pyread(sel)
+	sel_params = [str(p['committee_id']), str(p['ordinance_id'])]
+	rd=pyread_safe(sel, sel_params)
 	
 	if rd[0]['counter']==0 or rd[0]['counter']=="0":
 		delete="""
 			delete from tbl_committee_ref_ordinance 
-			where committee_id="""+str(p['committee_id'])+""" and ordinance_id="""+str(p['ordinance_id'])+"""
-			and committee_ref_id='"""+str(p['committee_ref_id'])+"""' 
+			where committee_id=%s and ordinance_id=%s
+			and committee_ref_id=%s 
 		"""
-		cud(delete)
+		delete_params = [str(p['committee_id']), str(p['ordinance_id']), str(p['committee_ref_id'])]
+		cud_safe(delete, delete_params)
 		return jsonify("Successfully Deleted")
 	else:
 
@@ -630,16 +701,18 @@ def delete_committee_ref_resolution():
 	p=json.loads(request.data)
 	sel="""
 		select count(*) counter from tbl_resolution_file_committee 
-		where committee_id="""+str(p['committee_id'])+""" and resolution_id="""+str(p['resolution_id'])+"""
+		where committee_id=%s and resolution_id=%s
 	"""
-	rd=pyread(sel)
+	sel_params = [str(p['committee_id']), str(p['resolution_id'])]
+	rd=pyread_safe(sel, sel_params)
 	if rd[0]['counter']==0 or rd[0]['counter']=="0":
 		delete="""
 			delete from tbl_committee_ref_resolution 
-			where committee_id="""+str(p['committee_id'])+""" and resolution_id="""+str(p['resolution_id'])+"""
-			and committee_resolution_id='"""+str(p['committee_resolution_id'])+"""'
+			where committee_id=%s and resolution_id=%s
+			and committee_resolution_id=%s
 		"""
-		cud(delete)
+		delete_params = [str(p['committee_id']), str(p['resolution_id']), str(p['committee_resolution_id'])]
+		cud_safe(delete, delete_params)
 		return jsonify("Successfully Deleted")
 	else:
 		return jsonify("You cannot Remove From referal")
@@ -651,16 +724,18 @@ def delete_committee_ref_petition():
 	p=json.loads(request.data)
 	sel="""
 		select count(*) counter from tbl_petition_path_committee 
-		where committee_id="""+str(p['committee_id'])+""" and petition_id="""+str(p['petition_id'])+"""
+		where committee_id=%s and petition_id=%s
 	"""
-	rd=pyread(sel)
+	sel_params = [str(p['committee_id']), str(p['petition_id'])]
+	rd=pyread_safe(sel, sel_params)
 	if rd[0]['counter']==0 or rd[0]['counter']=="0":
 		delete="""
 			delete from tbl_committee_ref_petition 
-			where committee_id="""+str(p['committee_id'])+""" and petition_id="""+str(p['petition_id'])+""" 
-			and committee_ref_petition_id='"""+str(p['committee_ref_petition_id'])+"""'
+			where committee_id=%s and petition_id=%s 
+			and committee_ref_petition_id=%s
 		"""
-		cud(delete)
+		delete_params = [str(p['committee_id']), str(p['petition_id']), str(p['committee_ref_petition_id'])]
+		cud_safe(delete, delete_params)
 		return jsonify("Successfully Deleted")
 	else:
 		return jsonify("You cannot Remove From referal")
@@ -673,9 +748,10 @@ def get_committee_resolution():
 	sel="""
 		select * from tbl_resolution tr
 		left join tbl_committee_ref_resolution tcrr on tcrr.resolution_id=tr.resolution_id
-		where tcrr.committee_id='"""+str(p['committee_id'])+"""'
+		where tcrr.committee_id=%s
 	"""
-	rd=pyread(sel)
+	sel_params = [str(p['committee_id'])]
+	rd=pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 @query.route('/get_ordinance', methods=['GET', 'POST'])
@@ -737,10 +813,11 @@ def get_ordinance_status():
 		left join tbl_ordinance_file_committee tofc on tofc.ordinance_id=tbo.ordinance_id
 		left join tbl_committee_ref_ordinance tcro on tcro.ordinance_id=tbo.ordinance_id
 		left join tbl_sp ts on ts.sp_id=tbo.sp_id
-		where tbo.`status`='"""+str(p['status'])+"""' and ts.`status`='ACTIVE' and type_ord='Ordinance'
+		where tbo.`status`=%s and ts.`status`='ACTIVE' and type_ord='Ordinance'
 		GROUP BY tbo.ordinance_id
 	"""
-	rd=pyread(select)
+	select_params = [str(p['status'])]
+	rd=pyread_safe(select, select_params)
 	return jsonify(rd)
 
 
@@ -771,10 +848,11 @@ def get_ordinance_status_appropriation():
 		left join tbl_ordinance_file_committee tofc on tofc.ordinance_id=tbo.ordinance_id
 		left join tbl_committee_ref_ordinance tcro on tcro.ordinance_id=tbo.ordinance_id
 		left join tbl_sp ts on ts.sp_id=tbo.sp_id
-		where tbo.`status`='"""+str(p['status'])+"""' and ts.`status`='ACTIVE' and type_ord='Appropriation Ordinance'
+		where tbo.`status`=%s and ts.`status`='ACTIVE' and type_ord='Appropriation Ordinance'
 		GROUP BY tbo.ordinance_id
 	"""
-	rd=pyread(select)
+	select_params = [str(p['status'])]
+	rd=pyread_safe(select, select_params)
 	return jsonify(rd)
 
 @query.route('/get_resolution', methods=['GET', 'POST'])
@@ -801,10 +879,11 @@ def get_resolution():
 		left join tbl_resolution_file_committee trfc on trfc.resolution_id=tr.resolution_id
 		left join tbl_sp ts on ts.sp_id=tr.sp_id
 		left join tbl_committee tc2 on tc2.sp_id=ts.sp_id
-		where tr.`status`='"""+str(p['status'])+"""' and ts.`status`='ACTIVE'
+		where tr.`status`=%s and ts.`status`='ACTIVE'
 		GROUP BY tr.resolution_id
 	"""
-	rd=pyread(sel)
+	sel_params = [str(p['status'])]
+	rd=pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 @query.route('/get_resolution_list', methods=['GET', 'POST'])
@@ -852,8 +931,9 @@ def view_resolution():
 @login_required
 def save_member_allocation():
 	p=json.loads(request.data)
-	update="update tbl_sp_budget_balance set  allocation='"+str(p['allocation'])+"' where balance_id ='"+str(p['balance_id'])+"'"
-	cud(update)
+	update="""update tbl_sp_budget_balance set  allocation=%s where balance_id =%s"""
+	update_params = [str(p['allocation']), str(p['balance_id'])]
+	cud_safe(update, update_params)
 	return jsonify("Succesfuly Saved")
 
 
@@ -874,15 +954,17 @@ def get_session():
 @login_required
 def save_gov_classification():
 	p=json.loads(request.data)
-	title=p['title'].replace("'","''")
+	title=p['title']
 	try:
 		if p['h_gov_classification']==0 or p['h_gov_classification']=="0":
-			insert="insert into tbl_governance_classification set title='"+str(title)+"'"
-			cud(insert)
+			insert="""insert into tbl_governance_classification set title=%s"""
+			insert_params = [str(title)]
+			cud_safe(insert, insert_params)
 			return jsonify("Succesfuly Saved")
 		else:
-			update="update tbl_governance_classification set title='"+str(title)+"' where classification_id='"+str(p['h_gov_classification'])+"'"
-			cud(update)
+			update="""update tbl_governance_classification set title=%s where classification_id=%s"""
+			update_params = [str(title), str(p['h_gov_classification'])]
+			cud_safe(update, update_params)
 			return jsonify("Succesfuly Updated")
 	except Exception as e:
 		raise e
@@ -899,14 +981,16 @@ def get_gov_classification():
 @login_required
 def save_category():
 	p=json.loads(request.data)
-	title=p['title'].replace("'","''")
+	title=p['title']
 	if p['h_category_id']==0 or p['h_category_id']=="0":
-		insert="insert into tbl_category set title='"+str(title)+"'"
-		cud(insert)
+		insert="""insert into tbl_category set title=%s"""
+		insert_params = [str(title)]
+		cud_safe(insert, insert_params)
 		return jsonify("Succesfuly Saved")
 	else:
-		update="update tbl_category set title='"+str(title)+"' where category_id='"+str(p['h_category_id'])+"'"
-		cud(update)
+		update="""update tbl_category set title=%s where category_id=%s"""
+		update_params = [str(title), str(p['h_category_id'])]
+		cud_safe(update, update_params)
 		return jsonify("Succesfuly Updated")
 
 @query.route('/get_category', methods=['GET', 'POST'])
@@ -920,39 +1004,44 @@ def get_category():
 @login_required
 def del_category():
 	p=json.loads(request.data)
-	delete="delete from tbl_category where category_id ='"+str(p['category_id'])+"'"
-	cud(delete)
+	delete="""delete from tbl_category where category_id =%s"""
+	delete_params = [str(p['category_id'])]
+	cud_safe(delete, delete_params)
 	return jsonify("Succesfuly Deleted")
 
 @query.route('/del_classification', methods=['GET', 'POST'])
 @login_required
 def del_classification():
 	p=json.loads(request.data)
-	delete="delete from tbl_governance_classification where classification_id ='"+str(p['classification_id'])+"'"
-	cud(delete)
+	delete="""delete from tbl_governance_classification where classification_id =%s"""
+	delete_params = [str(p['classification_id'])]
+	cud_safe(delete, delete_params)
 	return jsonify("Succesfuly Deleted")
 
 @query.route('/save_capital_outlay', methods=['GET', 'POST'])
 @login_required
 def save_capital_outlay():
 	p=json.loads(request.data)
-	descr=p['description'].replace("'","''")
-	insert_co_added="insert into tbl_capital_outlay_added set amount_added='"+str(p['amount'])+"',description='"+str(descr)+"', added_date=curdate()"
-	cud(insert_co_added)
+	descr=p['description']
+	insert_co_added="""insert into tbl_capital_outlay_added set amount_added=%s,description=%s, added_date=curdate()"""
+	insert_co_added_params = [str(p['amount']), str(descr)]
+	cud_safe(insert_co_added, insert_co_added_params)
 	return jsonify("Succesfuly Added")
 
 @query.route('/save_capital_outlay_deduction', methods=['GET', 'POST'])
 @login_required
 def save_capital_outlay_deduction():
 	p=json.loads(request.data)
-	descr=p['description'].replace("'","''")
-	insert_co_added="insert into tbl_capital_outlay_deduction set amount_deduction='"+str(p['amount'])+"',description='"+str(descr)+"', deduction_date=curdate()"
-	rd_insert_co_added=cud_callbackid(insert_co_added)
+	descr=p['description']
+	insert_co_added="""insert into tbl_capital_outlay_deduction set amount_deduction=%s,description=%s, deduction_date=curdate()"""
+	insert_co_added_params = [str(p['amount']), str(descr)]
+	rd_insert_co_added=cud_callbackid_safe(insert_co_added, insert_co_added_params)
 
 	if 'items' in p:
 		for i in range(len(p['items'])):
-			insert_item="insert into tbl_capital_outlay_deduction_item set item='"+str(p['items'][i])+"', co_deduction_id='"+str(rd_insert_co_added)+"'"
-			cud(insert_item)
+			insert_item="""insert into tbl_capital_outlay_deduction_item set item=%s, co_deduction_id=%s"""
+			insert_item_params = [str(p['items'][i]), str(rd_insert_co_added)]
+			cud_safe(insert_item, insert_item_params)
 	return jsonify("Succesfuly Added")
 
 
@@ -989,9 +1078,10 @@ def get_deduction_items():
 	p=json.loads(request.data)
 	sel="""
 		select * from tbl_capital_outlay_deduction_item 
-		where co_deduction_id='"""+str(p['co_deduction_id'])+"""'
+		where co_deduction_id=%s
 	"""
-	rd=pyread(sel)
+	sel_params = [str(p['co_deduction_id'])]
+	rd=pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 @query.route('/get_sp_budget_balance', methods=['GET', 'POST'])
@@ -1002,14 +1092,16 @@ def get_sp_budget_balance():
 		select *,history_allocation allocations,tsbbe.deduction,tsbbe.history_allocation-tsbbe.deduction remaining_balance 
 		from tbl_sp_budget_balance_expenses tsbbe
 		left join tbl_sp_budget_balance tsbb on tsbb.balance_id=tsbbe.balance_id
-		where tsbbe.balance_id='"""+str(p['balance_id'])+"""'
+		where tsbbe.balance_id=%s
 	"""
-	rd=pyread(sel)
+	sel_params = [str(p['balance_id'])]
+	rd=pyread_safe(sel, sel_params)
 	if rd:
 		return jsonify(rd)
 	else:
-		sel="select *,allocation allocations,balance_id balance_expenses_id,expenses deduction,balance remaining_balance,'' description from tbl_sp_budget_balance where balance_id='"+str(p['balance_id'])+"'"
-		rd=pyread(sel)
+		sel="""select *,allocation allocations,balance_id balance_expenses_id,expenses deduction,balance remaining_balance,'' description from tbl_sp_budget_balance where balance_id=%s"""
+		sel_params = [str(p['balance_id'])]
+		rd=pyread_safe(sel, sel_params)
 		return jsonify(rd)
 
 
@@ -1017,8 +1109,9 @@ def get_sp_budget_balance():
 @login_required
 def del_added_capital_outlay():
 	p=json.loads(request.data)
-	delete="delete from tbl_capital_outlay_added where co_added_id='"+str(p['co_added_id'])+"'"
-	cud(delete)
+	delete="""delete from tbl_capital_outlay_added where co_added_id=%s"""
+	delete_params = [str(p['co_added_id'])]
+	cud_safe(delete, delete_params)
 	return jsonify('Succesfuly Deleted')
 
 
@@ -1026,8 +1119,9 @@ def del_added_capital_outlay():
 @login_required
 def del_deduction_capital_outlay():
 	p=json.loads(request.data)
-	delete="delete from tbl_capital_outlay_deduction where co_deduction_id='"+str(p['co_deduction_id'])+"'"
-	cud(delete)
+	delete="""delete from tbl_capital_outlay_deduction where co_deduction_id=%s"""
+	delete_params = [str(p['co_deduction_id'])]
+	cud_safe(delete, delete_params)
 	return jsonify('Succesfuly Deleted')
 
 
@@ -1038,17 +1132,20 @@ def get_sp_mem_remaining_bal():
 	p=json.loads(request.data)
 	sel="""
 		select max(balance_expenses_id) remaining_balance_id from tbl_sp_budget_balance_expenses
-		where balance_id='"""+str(p['balance_id'])+"""'
+		where balance_id=%s
 	"""
-	rd=pyread(sel)
+	sel_params = [str(p['balance_id'])]
+	rd=pyread_safe(sel, sel_params)
 	if rd[0]['remaining_balance_id']==None:
 		sel="""
-			select allocation remaining_balance,balance deduction from tbl_sp_budget_balance where balance_id='"""+str(p['balance_id'])+"""'
+			select allocation remaining_balance,balance deduction from tbl_sp_budget_balance where balance_id=%s
 		"""
-		rd=pyread(sel)
+		sel_params = [str(p['balance_id'])]
+		rd=pyread_safe(sel, sel_params)
 	else:
-		select ="select history_allocation remaining_balance,deduction from tbl_sp_budget_balance_expenses where balance_expenses_id ='"+str(rd[0]['remaining_balance_id'])+"'"
-		rd=pyread(select)
+		select ="""select history_allocation remaining_balance,deduction from tbl_sp_budget_balance_expenses where balance_expenses_id =%s"""
+		select_params = [str(rd[0]['remaining_balance_id'])]
+		rd=pyread_safe(select, select_params)
 	return jsonify(rd)
 
 @query.route('/save_deduction_sp_member', methods=['GET', 'POST'])
@@ -1056,14 +1153,16 @@ def get_sp_mem_remaining_bal():
 def save_deduction_sp_member():
 	p=json.loads(request.data)
 	if p['balance_expenses_id']=="0" or p['balance_expenses_id']==0:
-		descr=p['description'].replace("'","''")
-		insert="insert into tbl_sp_budget_balance_expenses set deduction='"+str(p['deduction'])+"', balance_id='"+str(p['balance_id'])+"', description='"+str(descr)+"', date_deduction=curdate() ,history_allocation='"+str(p['history_allocation'])+"'"
-		cud(insert)
+		descr=p['description']
+		insert="""insert into tbl_sp_budget_balance_expenses set deduction=%s, balance_id=%s, description=%s, date_deduction=curdate() ,history_allocation=%s"""
+		insert_params = [str(p['deduction']), str(p['balance_id']), str(descr), str(p['history_allocation'])]
+		cud_safe(insert, insert_params)
 		return jsonify("Succesfuly Saved")
 	else:
-		descr=p['description'].replace("'","''")
-		update="update tbl_sp_budget_balance_expenses set deduction='"+str(p['deduction'])+"', balance_id='"+str(p['balance_id'])+"', description='"+str(descr)+"', date_deduction=curdate() ,history_allocation='"+str(p['history_allocation'])+"' where balance_expenses_id='"+str(p['balance_expenses_id'])+"'"
-		cud(update)
+		descr=p['description']
+		update="""update tbl_sp_budget_balance_expenses set deduction=%s, balance_id=%s, description=%s, date_deduction=curdate() ,history_allocation=%s where balance_expenses_id=%s"""
+		update_params = [str(p['deduction']), str(p['balance_id']), str(descr), str(p['history_allocation']), str(p['balance_expenses_id'])]
+		cud_safe(update, update_params)
 		return jsonify("Updated Saved")
 
 
@@ -1091,8 +1190,9 @@ def get_petition_list():
 @login_required
 def del_petition():
 	p=json.loads(request.data)
-	delete="delete from tbl_petition where petition_id='"+str(p['petition_id'])+"'"
-	cud(delete)
+	delete="""delete from tbl_petition where petition_id=%s"""
+	delete_params = [str(p['petition_id'])]
+	cud_safe(delete, delete_params)
 	n_path = Path(__file__).parent / "../static/uploads/upload_files" / str(p['petition_id'])
 	n_path.resolve()
 	if Path.exists(n_path):
@@ -1104,8 +1204,9 @@ def del_petition():
 @login_required
 def del_resolution_file_attach():
 	p=json.loads(request.data)
-	delete="delete from tbl_resolution_file where resolution_file_id='"+str(p['resolution_file_id'])+"'"
-	cud(delete)
+	delete="""delete from tbl_resolution_file where resolution_file_id=%s"""
+	delete_params = [str(p['resolution_file_id'])]
+	cud_safe(delete, delete_params)
 	n_path = Path(__file__).parent / "../static/uploads/upload_files_resolution" / str(p['resolution_id'])
 	n_path.resolve()
 	if Path.exists(n_path):
@@ -1117,19 +1218,22 @@ def del_resolution_file_attach():
 @login_required
 def delete_petition_file():
 	p=json.loads(request.data)
-	sel="select * from tbl_petition_path where petition_id='"+str(p['petition_id'])+"'"
-	rd=pyread(sel)
+	sel="""select * from tbl_petition_path where petition_id=%s"""
+	sel_params = [str(p['petition_id'])]
+	rd=pyread_safe(sel, sel_params)
 	if rd:
 		n_path = Path(__file__).parent / "../static/uploads/" / rd[0]['path']
 		n_path.resolve()
 		if Path(n_path).is_file():
 			Path(n_path).unlink()
-			delete="delete from tbl_petition_path where petition_path_id='"+str(p['petition_path_id'])+"'"
-			cud(delete)
+			delete="""delete from tbl_petition_path where petition_path_id=%s"""
+			delete_params = [str(p['petition_path_id'])]
+			cud_safe(delete, delete_params)
 			return jsonify("Succesfuly Deleted")
 		else:
-			delete="delete from tbl_petition_path where petition_path_id='"+str(p['petition_path_id'])+"'"
-			cud(delete)
+			delete="""delete from tbl_petition_path where petition_path_id=%s"""
+			delete_params = [str(p['petition_path_id'])]
+			cud_safe(delete, delete_params)
 			return jsonify("File does not exist")
 	else:
 		return jsonify("Not exists in database")
@@ -1139,19 +1243,22 @@ def delete_petition_file():
 @login_required
 def del_document_referals_file():
 	p=json.loads(request.data)
-	sel="select * from tbl_documents_refferals_path where documents_refferals_id='"+str(p['documents_refferals_id'])+"'"
-	rd=pyread(sel)
+	sel="""select * from tbl_documents_refferals_path where documents_refferals_id=%s"""
+	sel_params = [str(p['documents_refferals_id'])]
+	rd=pyread_safe(sel, sel_params)
 	if rd:
 		n_path = Path(__file__).parent / "../static/uploads/" / rd[0]['path']
 		n_path.resolve()
 		if Path(n_path).is_file():
 			Path(n_path).unlink()
-			delete="delete from tbl_documents_refferals_path where documents_refferals_path_id='"+str(p['documents_refferals_path_id'])+"'"
-			cud(delete)
+			delete="""delete from tbl_documents_refferals_path where documents_refferals_path_id=%s"""
+			delete_params = [str(p['documents_refferals_path_id'])]
+			cud_safe(delete, delete_params)
 			return jsonify("Succesfuly Deleted")
 		else:
-			delete="delete from tbl_documents_refferals_path where documents_refferals_path_id='"+str(p['documents_refferals_path_id'])+"'"
-			cud(delete)
+			delete="""delete from tbl_documents_refferals_path where documents_refferals_path_id=%s"""
+			delete_params = [str(p['documents_refferals_path_id'])]
+			cud_safe(delete, delete_params)
 			return jsonify("File does not exist")
 	else:
 		return jsonify("Not exists in database")
@@ -1162,19 +1269,22 @@ def del_document_referals_file():
 @login_required
 def del_barangay_ordinance_file():
 	p=json.loads(request.data)
-	sel="select * from tbl_barangay_ordinance_path where barangay_ordinance_id='"+str(p['barangay_ordinance_id'])+"'"
-	rd=pyread(sel)
+	sel="""select * from tbl_barangay_ordinance_path where barangay_ordinance_id=%s"""
+	sel_params = [str(p['barangay_ordinance_id'])]
+	rd=pyread_safe(sel, sel_params)
 	if rd:
 		n_path = Path(__file__).parent / "../static/uploads/" / rd[0]['path']
 		n_path.resolve()
 		if Path(n_path).is_file():
 			Path(n_path).unlink()
-			delete="delete from tbl_barangay_ordinance_path where barangay_ordinance_path_id='"+str(p['barangay_ordinance_path_id'])+"'"
-			cud(delete)
+			delete="""delete from tbl_barangay_ordinance_path where barangay_ordinance_path_id=%s"""
+			delete_params = [str(p['barangay_ordinance_path_id'])]
+			cud_safe(delete, delete_params)
 			return jsonify("Succesfuly Deleted")
 		else:
-			delete="delete from tbl_barangay_ordinance_path where barangay_ordinance_path_id='"+str(p['barangay_ordinance_path_id'])+"'"
-			cud(delete)
+			delete="""delete from tbl_barangay_ordinance_path where barangay_ordinance_path_id=%s"""
+			delete_params = [str(p['barangay_ordinance_path_id'])]
+			cud_safe(delete, delete_params)
 			return jsonify("File does not exist")
 	else:
 		return jsonify("Not exists in database")
@@ -1184,19 +1294,22 @@ def del_barangay_ordinance_file():
 @login_required
 def del_barangay_resolution_file():
 	p=json.loads(request.data)
-	sel="select * from tbl_barangay_resolution_path where barangay_resolution_id='"+str(p['barangay_resolution_id'])+"'"
-	rd=pyread(sel)
+	sel="""select * from tbl_barangay_resolution_path where barangay_resolution_id=%s"""
+	sel_params = [str(p['barangay_resolution_id'])]
+	rd=pyread_safe(sel, sel_params)
 	if rd:
 		n_path = Path(__file__).parent / "../static/uploads/" / rd[0]['path']
 		n_path.resolve()
 		if Path(n_path).is_file():
 			Path(n_path).unlink()
-			delete="delete from tbl_barangay_resolution_path where barangay_resolution_path_id='"+str(p['barangay_resolution_path_id'])+"'"
-			cud(delete)
+			delete="""delete from tbl_barangay_resolution_path where barangay_resolution_path_id=%s"""
+			delete_params = [str(p['barangay_resolution_path_id'])]
+			cud_safe(delete, delete_params)
 			return jsonify("Succesfuly Deleted")
 		else:
-			delete="delete from tbl_barangay_resolution_path where barangay_resolution_path_id='"+str(p['barangay_resolution_path_id'])+"'"
-			cud(delete)
+			delete="""delete from tbl_barangay_resolution_path where barangay_resolution_path_id=%s"""
+			delete_params = [str(p['barangay_resolution_path_id'])]
+			cud_safe(delete, delete_params)
 			return jsonify("File does not exist")
 	else:
 		return jsonify("Not exists in database")
@@ -1207,19 +1320,22 @@ def del_barangay_resolution_file():
 @login_required
 def del_executive_order_file():
 	p=json.loads(request.data)
-	sel="select * from tbl_executive_order_path where executive_order_id='"+str(p['executive_order_id'])+"'"
-	rd=pyread(sel)
+	sel="""select * from tbl_executive_order_path where executive_order_id=%s"""
+	sel_params = [str(p['executive_order_id'])]
+	rd=pyread_safe(sel, sel_params)
 	if rd:
 		n_path = Path(__file__).parent / "../static/uploads/" / rd[0]['path']
 		n_path.resolve()
 		if Path(n_path).is_file():
 			Path(n_path).unlink()
-			delete="delete from tbl_executive_order_path where executive_order_path_id='"+str(p['executive_order_path_id'])+"'"
-			cud(delete)
+			delete="""delete from tbl_executive_order_path where executive_order_path_id=%s"""
+			delete_params = [str(p['executive_order_path_id'])]
+			cud_safe(delete, delete_params)
 			return jsonify("Succesfuly Deleted")
 		else:
-			delete="delete from tbl_executive_order_path where executive_order_path_id='"+str(p['executive_order_path_id'])+"'"
-			cud(delete)
+			delete="""delete from tbl_executive_order_path where executive_order_path_id=%s"""
+			delete_params = [str(p['executive_order_path_id'])]
+			cud_safe(delete, delete_params)
 			return jsonify("File does not exist")
 	else:
 		return jsonify("Not exists in database")
@@ -1229,19 +1345,22 @@ def del_executive_order_file():
 @login_required
 def del_memorandom_file():
 	p=json.loads(request.data)
-	sel="select * from tbl_memorandom_path where memorandom_id='"+str(p['memorandom_id'])+"'"
-	rd=pyread(sel)
+	sel="""select * from tbl_memorandom_path where memorandom_id=%s"""
+	sel_params = [str(p['memorandom_id'])]
+	rd=pyread_safe(sel, sel_params)
 	if rd:
 		n_path = Path(__file__).parent / "../static/uploads/" / rd[0]['path']
 		n_path.resolve()
 		if Path(n_path).is_file():
 			Path(n_path).unlink()
-			delete="delete from tbl_memorandom_path where memorandom_path_id='"+str(p['memorandom_path_id'])+"'"
-			cud(delete)
+			delete="""delete from tbl_memorandom_path where memorandom_path_id=%s"""
+			delete_params = [str(p['memorandom_path_id'])]
+			cud_safe(delete, delete_params)
 			return jsonify("Succesfuly Deleted")
 		else:
-			delete="delete from tbl_memorandom_path where memorandom_path_id='"+str(p['memorandom_path_id'])+"'"
-			cud(delete)
+			delete="""delete from tbl_memorandom_path where memorandom_path_id=%s"""
+			delete_params = [str(p['memorandom_path_id'])]
+			cud_safe(delete, delete_params)
 			return jsonify("File does not exist")
 	else:
 		return jsonify("Not exists in database")
@@ -1250,16 +1369,18 @@ def del_memorandom_file():
 @login_required
 def get_petition_path2():
 	p=json.loads(request.data)
-	sel="select * from tbl_petition_path where petition_id='"+str(p['petition_id'])+"'"
-	rd=pyread(sel)
+	sel="""select * from tbl_petition_path where petition_id=%s"""
+	sel_params = [str(p['petition_id'])]
+	rd=pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 @query.route('/del_documents_refferals', methods=['GET', 'POST'])
 @login_required
 def del_documents_refferals():
 	p=json.loads(request.data)
-	delete="delete from tbl_documents_refferals where documents_refferals_id='"+str(p['document_referal_id'])+"'"
-	cud(delete)
+	delete="""delete from tbl_documents_refferals where documents_refferals_id=%s"""
+	delete_params = [str(p['document_referal_id'])]
+	cud_safe(delete, delete_params)
 	n_path = Path(__file__).parent / "../static/uploads/upload_document_referals" / str(p['document_referal_id'])
 	n_path.resolve()
 	if Path.exists(n_path):
@@ -1271,8 +1392,9 @@ def del_documents_refferals():
 @login_required
 def del_barangay_ordinance():
 	p=json.loads(request.data)
-	delete="delete from tbl_barangay_ordinance where barangay_ordinance_id='"+str(p['barangay_ordinance_id'])+"'"
-	cud(delete)
+	delete="""delete from tbl_barangay_ordinance where barangay_ordinance_id=%s"""
+	delete_params = [str(p['barangay_ordinance_id'])]
+	cud_safe(delete, delete_params)
 	n_path = Path(__file__).parent / "../static/uploads/upload_barangay_ordinance" / str(p['barangay_ordinance_id'])
 	n_path.resolve()
 	if Path.exists(n_path):
@@ -1284,8 +1406,9 @@ def del_barangay_ordinance():
 @login_required
 def del_barangay_resolution():
 	p=json.loads(request.data)
-	delete="delete from tbl_barangay_resolution where barangay_resolution_id='"+str(p['barangay_resolution_id'])+"'"
-	cud(delete)
+	delete="""delete from tbl_barangay_resolution where barangay_resolution_id=%s"""
+	delete_params = [str(p['barangay_resolution_id'])]
+	cud_safe(delete, delete_params)
 	n_path = Path(__file__).parent / "../static/uploads/upload_barangay_resolution" / str(p['barangay_resolution_id'])
 	n_path.resolve()
 	if Path.exists(n_path):
@@ -1297,8 +1420,9 @@ def del_barangay_resolution():
 @login_required
 def del_executive_order():
 	p=json.loads(request.data)
-	delete="delete from tbl_executive_order where executive_order_id='"+str(p['executive_order_id'])+"'"
-	cud(delete)
+	delete="""delete from tbl_executive_order where executive_order_id=%s"""
+	delete_params = [str(p['executive_order_id'])]
+	cud_safe(delete, delete_params)
 	n_path = Path(__file__).parent / "../static/uploads/upload_executive_order" / str(p['executive_order_id'])
 	n_path.resolve()
 	if Path.exists(n_path):
@@ -1309,8 +1433,9 @@ def del_executive_order():
 @login_required
 def del_memorandom():
 	p=json.loads(request.data)
-	delete="delete from tbl_memorandom where memorandom_id='"+str(p['memorandom_id'])+"'"
-	cud(delete)
+	delete="""delete from tbl_memorandom where memorandom_id=%s"""
+	delete_params = [str(p['memorandom_id'])]
+	cud_safe(delete, delete_params)
 	n_path = Path(__file__).parent / "../static/uploads/upload_memorandom" / str(p['memorandom_id'])
 	n_path.resolve()
 	if Path.exists(n_path):
@@ -1323,10 +1448,11 @@ def del_memorandom():
 def save_petition_ref_committee():
 	p=json.loads(request.data)
 	insert_ref_petition="""
-		insert into tbl_committee_ref_petition set committee_id='"""+str(p['committee_id'])+"""',
-		petition_id='"""+str(p['petition_id_main'])+"""', date_reffered=now()
+		insert into tbl_committee_ref_petition set committee_id=%s,
+		petition_id=%s, date_reffered=now()
 	"""
-	cud(insert_ref_petition)
+	insert_ref_petition_params = [str(p['committee_id']), str(p['petition_id_main'])]
+	cud_safe(insert_ref_petition, insert_ref_petition_params)
 	return jsonify("Succesfuly Saved")
 
 
@@ -1337,9 +1463,10 @@ def get_committee_petition():
 	sel="""
 		select * from tbl_petition tp
 		left join tbl_committee_ref_petition tcrp on tcrp.petition_id=tp.petition_id
-		where tcrp.committee_id='"""+str(p['committee_id'])+"""'
+		where tcrp.committee_id=%s
 	"""
-	rd=pyread(sel)
+	sel_params = [str(p['committee_id'])]
+	rd=pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 @query.route('/get_petition_committee', methods=['GET', 'POST'])
@@ -1348,9 +1475,10 @@ def get_petition_committee():
 	p=json.loads(request.data)
 	sel="""
 		select * from tbl_petition tp
-		where petition_id='"""+str(p['petition_id'])+"""'
+		where petition_id=%s
 	"""
-	rd=pyread(sel)
+	sel_params = [str(p['petition_id'])]
+	rd=pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 
@@ -1358,8 +1486,9 @@ def get_petition_committee():
 @login_required
 def save_ordinance_committee():
 	p=json.loads(request.data)
-	insert_committee="insert into tbl_committee_ref_ordinance set  committee_id='"+str(p['committee_id'])+"', ordinance_id='"+str(p['ordinance_id'])+"', date_reffered=now()"
-	cud(insert_committee)
+	insert_committee="""insert into tbl_committee_ref_ordinance set  committee_id=%s, ordinance_id=%s, date_reffered=now()"""
+	insert_committee_params = [str(p['committee_id']), str(p['ordinance_id'])]
+	cud_safe(insert_committee, insert_committee_params)
 	return jsonify("Succesfuly Saved")
 
 
@@ -1369,9 +1498,9 @@ def save_ordinance():
 	p=request.form
 	p=json.loads(p['Serialized'])
 
-	descr=p['description'].replace("'","''")
-	ordinance_title=p['ordinance_title'].replace("'","''")
-	minutes_title=p['minutes_title'].replace("'","''")
+	descr=p['description']
+	ordinance_title=p['ordinance_title']
+	minutes_title=p['minutes_title']
 
 	new_lst=(','.join(p['ref_committee'][0]))
 
@@ -1393,50 +1522,57 @@ def save_ordinance():
 		p['sp_id']=r_sp_id[0]['sp_id']
 
 	if p['ordinance_id']=="0" or p['ordinance_id']==0:
-		sel_if_exst_ord_no="select count(*) count_ord_num from tbl_ordinance where ordinance_number='"+str(p['ordinance_no'])+"'"
-		rd_count=pyread(sel_if_exst_ord_no)
+		sel_if_exst_ord_no="""select count(*) count_ord_num from tbl_ordinance where ordinance_number=%s"""
+		sel_if_exst_ord_no_params = [str(p['ordinance_no'])]
+		rd_count=pyread_safe(sel_if_exst_ord_no, sel_if_exst_ord_no_params)
 
 		categories = str(p['categories'][0]).replace("'",'').replace("[","").replace("]","").replace(" ", "")
  
 		if rd_count[0]['count_ord_num']==0:
 			insert="""
-				insert into tbl_ordinance set ordinance_title='"""+str(ordinance_title)+"""', ordinance_number='"""+str(p['ordinance_no'])+"""',
-				date_enacted='"""+str(p['date_enacted'])+"""', category='"""+str(categories)+"""', sp_id='"""+str(p['sp_id'])+"""',
-				session_id='"""+str(p['session_id'])+"""', tracking_number='"""+str(p['tracking_no'])+"""',
-				classification_id='"""+str(p['gov_classification'])+"""', source_of_document='"""+str(p['source_of_document'])+"""', 
-				source_document_specify='"""+str(p['source_document_specify'])+"""', `status`='"""+str(p['status_ordinance'])+"""',
-				remarks='"""+str(p['remarks'])+"""', description='"""+str(descr)+"""', series_number='"""+str(p['series_number'])+"""',
-				type_ord='"""+str(p['type_ord'])+"""'
+				insert into tbl_ordinance set ordinance_title=%s, ordinance_number=%s,
+				date_enacted=%s, category=%s, sp_id=%s,
+				session_id=%s, tracking_number=%s,
+				classification_id=%s, source_of_document=%s, 
+				source_document_specify=%s, `status`=%s,
+				remarks=%s, description=%s, series_number=%s,
+				type_ord=%s
 			"""
-			rd=cud_callbackid(insert)
+			insert_params = [str(ordinance_title), str(p['ordinance_no']), str(p['date_enacted']), str(categories), str(p['sp_id']), str(p['session_id']), str(p['tracking_no']), str(p['gov_classification']), str(p['source_of_document']), str(p['source_document_specify']), str(p['status_ordinance']), str(p['remarks']), str(descr), str(p['series_number']), str(p['type_ord'])]
+			rd=cud_callbackid_safe(insert, insert_params)
 
 			insert2="""
-				insert into tbl_ordinance_status_numbers set original='"""+str(p['original'])+"""',
-				ammended_no='"""+str(p['ammended_no'])+"""', repealed_no='"""+str(p['repealed_no'])+"""', 
-				superseded_no='"""+str(p['superseded_no'])+"""', missing_ord='"""+str(p['missing_ord'])+"""',
-				ordinance_id='"""+str(rd)+"""'
+				insert into tbl_ordinance_status_numbers set original=%s,
+				ammended_no=%s, repealed_no=%s, 
+				superseded_no=%s, missing_ord=%s,
+				ordinance_id=%s
 			"""
-			cud(insert2)
+			insert2_params = [str(p['original']), str(p['ammended_no']), str(p['repealed_no']), str(p['superseded_no']), str(p['missing_ord']), str(rd)]
+			cud_safe(insert2, insert2_params)
 
 			if p['ref_committee'][0]:
 				for i in p['ref_committee'][0]:
-					insert_committee="insert into tbl_committee_ref_ordinance set  committee_id='"+str(i)+"', ordinance_id='"+str(rd)+"', date_reffered=now()"
-					cud(insert_committee)
+					insert_committee="""insert into tbl_committee_ref_ordinance set  committee_id=%s, ordinance_id=%s, date_reffered=now()"""
+					insert_committee_params = [str(i), str(rd)]
+					cud_safe(insert_committee, insert_committee_params)
 
 			if 'input_authors' in p:
 				for i in p['input_authors']:
-					insert_author="insert into tbl_ordinance_author set author='"+str(i)+"', ordinance_id='"+str(rd)+"'"
-					cud(insert_author)
+					insert_author="""insert into tbl_ordinance_author set author=%s, ordinance_id=%s"""
+					insert_author_params = [str(i), str(rd)]
+					cud_safe(insert_author, insert_author_params)
 
 			if 'input_co_authors' in p:
 				for i in p['input_co_authors']:
-					insert_co_author="insert into tbl_ordinance_co_author set co_author='"+str(i)+"', ordinance_id='"+str(rd)+"'"
-					cud(insert_co_author)
+					insert_co_author="""insert into tbl_ordinance_co_author set co_author=%s, ordinance_id=%s"""
+					insert_co_author_params = [str(i), str(rd)]
+					cud_safe(insert_co_author, insert_co_author_params)
 
 			if 'input_sponsor' in p:
 				for i in p['input_sponsor']:
-					insert_sponsor="insert into tbl_ordinance_sponsor set sponsor='"+str(i)+"', ordinance_id='"+str(rd)+"'"
-					cud(insert_sponsor)
+					insert_sponsor="""insert into tbl_ordinance_sponsor set sponsor=%s, ordinance_id=%s"""
+					insert_sponsor_params = [str(i), str(rd)]
+					cud_safe(insert_sponsor, insert_sponsor_params)
 			x=-1
 			y=-1
 			z=-1
@@ -1466,8 +1602,9 @@ def save_ordinance():
 						location=location1+"/"+filename.replace("'","")
 						path_location=location.replace("/", "\\\\");
 						
-						insert2="insert into tbl_ordinance_file set filename='"+str(file.filename.replace("'",""))+"', path='"+str(path_location)+"', ordinance_id='"+str(rd)+"'"
-						cud(insert2)
+						insert2="""insert into tbl_ordinance_file set filename=%s, path=%s, ordinance_id=%s"""
+						insert2_params = [str(file.filename.replace("'","")), str(path_location), str(rd)]
+						cud_safe(insert2, insert2_params)
 						
 
 					# file committee na ni  ---------------------------------->
@@ -1495,8 +1632,9 @@ def save_ordinance():
 						location=location1+"/"+filename.replace("'","")
 						path_location=location.replace("/", "\\\\");
 
-						insert2="insert into tbl_ordinance_file_committee set path='"+str(path_location)+"' , filename='"+str(file.filename.replace("'",""))+"' , ordinance_id='"+str(rd)+"', committee_id='"+str(new_lst)+"'"
-						cud(insert2)
+						insert2="""insert into tbl_ordinance_file_committee set path=%s , filename=%s , ordinance_id=%s, committee_id=%s"""
+						insert2_params = [str(path_location), str(file.filename.replace("'","")), str(rd), str(new_lst)]
+						cud_safe(insert2, insert2_params)
 
 				if str(split[0])=="file_veto":
 					z=z+1
@@ -1521,11 +1659,13 @@ def save_ordinance():
 						location=location1+"/"+filename.replace("'","")
 						path_location=location.replace("/", "\\\\");
 
-						insert_veto="insert into tbl_veto_ordinance set filename='"+str(file.filename.replace("'",""))+"', path='"+str(path_location)+"', ordinance_id='"+str(rd)+"'"
-						cud(insert_veto)
+						insert_veto="""insert into tbl_veto_ordinance set filename=%s, path=%s, ordinance_id=%s"""
+						insert_veto_params = [str(file.filename.replace("'","")), str(path_location), str(rd)]
+						cud_safe(insert_veto, insert_veto_params)
 
-			sel_ord="select * from tbl_ordinance where ordinance_id='"+str(rd)+"'"
-			rd_ordinance=pyread(sel_ord)
+			sel_ord="""select * from tbl_ordinance where ordinance_id=%s"""
+			sel_ord_params = [str(rd)]
+			rd_ordinance=pyread_safe(sel_ord, sel_ord_params)
 
 			if p['status_ordinance']=="1":
 				doc_status = "Propose Ordinance"
@@ -1544,17 +1684,24 @@ def save_ordinance():
 			elif p['status_ordinance']=="8":
 				doc_status = "Archive Ordinance"
 
-			if p['tracking_no']:
+			if p.get('tracking_no'):
+				tracking_no = validate_string(p['tracking_no'], 50)
+				
+				# Get track_gen_id from tracking number (FIX: removed trailing comma)
 				select_tracking = """
-					select track_gen_id from tbl_document_tracking where tracking_no='"""+str(p['tracking_no'])+"""',
+					SELECT track_gen_id FROM tbl_document_tracking WHERE tracking_no=%s
 				"""
-				rd_sel_tracking = pyread(select_tracking)
+				rd_sel_tracking = pyread_safe(select_tracking, (tracking_no,))
 
-				if rd_sel_tracking:
-					insert_tracking_status = """
-						insert into tbl_document_tracking_status  set track_gen_id='"""+str(rd_sel_tracking[0]['track_gen_id'])+"""', status='Approved', date=now()
-					"""
-					cud(insert_tracking_status)
+				if rd_sel_tracking and len(rd_sel_tracking) > 0:
+					track_gen_id = validate_int(rd_sel_tracking[0].get('track_gen_id', 0))
+					
+					if track_gen_id > 0:
+						insert_tracking_status = """
+							INSERT INTO tbl_document_tracking_status (track_gen_id, status, date)
+							VALUES (%s, %s, NOW())
+						"""
+						cud_safe(insert_tracking_status, (track_gen_id, 'Approved'))
 
 			return jsonify("Succesfuly Saved")
 
@@ -1563,10 +1710,11 @@ def save_ordinance():
 	else:
 		sel_if_exst_ord_no="""
 			select count(*) count_ord_num from tbl_ordinance 
-			where ordinance_number='"""+str(p['ordinance_no'])+"""' and 
-			ordinance_id!='"""+str(p['ordinance_id'])+"""'
+			where ordinance_number=%s and 
+			ordinance_id!=%s
 		"""
-		rd_count=pyread(sel_if_exst_ord_no)
+		sel_if_exst_ord_no_params = [str(p['ordinance_no']), str(p['ordinance_id'])]
+		rd_count=pyread_safe(sel_if_exst_ord_no, sel_if_exst_ord_no_params)
 
 		# if rd_count[0]['count_ord_num']==0:
 			
@@ -1576,57 +1724,67 @@ def save_ordinance():
 		categories = str(p['categories'][0]).replace("'","").replace("[","").replace("]","").replace(" ", "")
 
 		update="""
-			update tbl_ordinance set ordinance_title='"""+str(ordinance_title)+"""', ordinance_number='"""+str(p['ordinance_no'])+"""',
-			date_enacted='"""+str(p['date_enacted'])+"""',category='"""+str(categories)+"""', sp_id='"""+str(p['sp_id'])+"""',
-			session_id='"""+str(p['session_id'])+"""',tracking_number='"""+str(p['tracking_no'])+"""',
-			classification_id='"""+str(p['gov_classification'])+"""', source_of_document='"""+str(p['source_of_document'])+"""', 
-			source_document_specify='"""+str(p['source_document_specify'])+"""', `status`='"""+str(p['status_ordinance'])+"""',
-			remarks='"""+str(p['remarks'])+"""', description='"""+str(descr)+"""',series_number='"""+str(p['series_number'])+"""',
-			type_ord='"""+str(p['type_ord'])+"""'
-			where ordinance_id='"""+str(p['ordinance_id'])+"""'
+			update tbl_ordinance set ordinance_title=%s, ordinance_number=%s,
+			date_enacted=%s,category=%s, sp_id=%s,
+			session_id=%s,tracking_number=%s,
+			classification_id=%s, source_of_document=%s, 
+			source_document_specify=%s, `status`=%s,
+			remarks=%s, description=%s,series_number=%s,
+			type_ord=%s
+			where ordinance_id=%s
 		"""
-		cud(update)
+		update_params = [str(ordinance_title), str(p['ordinance_no']), str(p['date_enacted']), str(categories), str(p['sp_id']), str(p['session_id']), str(p['tracking_no']), str(p['gov_classification']), str(p['source_of_document']), str(p['source_document_specify']), str(p['status_ordinance']), str(p['remarks']), str(descr), str(p['series_number']), str(p['type_ord']), str(p['ordinance_id'])]
+		cud_safe(update, update_params)
 
 		update2="""
-			update tbl_ordinance_status_numbers set original='"""+str(p['original'])+"""',
-			ammended_no='"""+str(p['ammended_no'])+"""', repealed_no='"""+str(p['repealed_no'])+"""', 
-			superseded_no='"""+str(p['superseded_no'])+"""', missing_ord='"""+str(p['missing_ord'])+"""'
-			where ordinance_id='"""+str(p['ordinance_id'])+"""'
+			update tbl_ordinance_status_numbers set original=%s,
+			ammended_no=%s, repealed_no=%s, 
+			superseded_no=%s, missing_ord=%s
+			where ordinance_id=%s
 		"""
-		cud(update2)
+		update2_params = [str(p['original']), str(p['ammended_no']), str(p['repealed_no']), str(p['superseded_no']), str(p['missing_ord']), str(p['ordinance_id'])]
+		cud_safe(update2, update2_params)
 
 
-		delete_committee="delete from tbl_committee_ref_ordinance where ordinance_id='"+str(p['ordinance_id'])+"'"
-		cud(delete_committee)
+		delete_committee="""delete from tbl_committee_ref_ordinance where ordinance_id=%s"""
+		delete_committee_params = [str(p['ordinance_id'])]
+		cud_safe(delete_committee, delete_committee_params)
 
 		for i in p['ref_committee'][0]:
-			insert_committee="insert into tbl_committee_ref_ordinance set  committee_id='"+str(i)+"', ordinance_id='"+str(p['ordinance_id'])+"', date_reffered=now()"
-			cud(insert_committee)
+			insert_committee="""insert into tbl_committee_ref_ordinance set  committee_id=%s, ordinance_id=%s, date_reffered=now()"""
+			insert_committee_params = [str(i), str(p['ordinance_id'])]
+			cud_safe(insert_committee, insert_committee_params)
 
 
-		delete_authors="delete from tbl_ordinance_author where ordinance_id='"+str(p['ordinance_id'])+"'"
-		cud(delete_authors)
+		delete_authors="""delete from tbl_ordinance_author where ordinance_id=%s"""
+		delete_authors_params = [str(p['ordinance_id'])]
+		cud_safe(delete_authors, delete_authors_params)
 
-		delete_co_authors="delete from tbl_ordinance_co_author where ordinance_id='"+str(p['ordinance_id'])+"'"
-		cud(delete_co_authors)
+		delete_co_authors="""delete from tbl_ordinance_co_author where ordinance_id=%s"""
+		delete_co_authors_params = [str(p['ordinance_id'])]
+		cud_safe(delete_co_authors, delete_co_authors_params)
 
-		delete_sponsor="delete from tbl_ordinance_sponsor where ordinance_id='"+str(p['ordinance_id'])+"'"
-		cud(delete_sponsor)
+		delete_sponsor="""delete from tbl_ordinance_sponsor where ordinance_id=%s"""
+		delete_sponsor_params = [str(p['ordinance_id'])]
+		cud_safe(delete_sponsor, delete_sponsor_params)
 
 		if 'input_authors' in p:
 			for i in p['input_authors']:
-				insert_author="insert into tbl_ordinance_author set author='"+str(i)+"', ordinance_id='"+str(p['ordinance_id'])+"'"
-				cud(insert_author)
+				insert_author="""insert into tbl_ordinance_author set author=%s, ordinance_id=%s"""
+				insert_author_params = [str(i), str(p['ordinance_id'])]
+				cud_safe(insert_author, insert_author_params)
 
 		if 'input_co_authors' in p:
 			for i in p['input_co_authors']:
-				insert_co_author="insert into tbl_ordinance_co_author set co_author='"+str(i)+"', ordinance_id='"+str(p['ordinance_id'])+"'"
-				cud(insert_co_author)
+				insert_co_author="""insert into tbl_ordinance_co_author set co_author=%s, ordinance_id=%s"""
+				insert_co_author_params = [str(i), str(p['ordinance_id'])]
+				cud_safe(insert_co_author, insert_co_author_params)
 
 		if 'input_sponsor' in p:
 			for i in p['input_sponsor']:
-				insert_sponsor="insert into tbl_ordinance_sponsor set sponsor='"+str(i)+"', ordinance_id='"+str(p['ordinance_id'])+"'"
-				cud(insert_sponsor)
+				insert_sponsor="""insert into tbl_ordinance_sponsor set sponsor=%s, ordinance_id=%s"""
+				insert_sponsor_params = [str(i), str(p['ordinance_id'])]
+				cud_safe(insert_sponsor, insert_sponsor_params)
 		x=-1
 		y=-1
 		z=-1
@@ -1656,8 +1814,9 @@ def save_ordinance():
 					location=location1+"/"+filename.replace("'","")
 					path_location=location.replace("/", "\\\\");
 					
-					insert2="insert into tbl_ordinance_file set filename='"+str(file.filename.replace("'",""))+"', path='"+str(path_location)+"', ordinance_id='"+str(p['ordinance_id'])+"'"
-					cud(insert2)
+					insert2="""insert into tbl_ordinance_file set filename=%s, path=%s, ordinance_id=%s"""
+					insert2_params = [str(file.filename.replace("'","")), str(path_location), str(p['ordinance_id'])]
+					cud_safe(insert2, insert2_params)
 					
 
 				# file committee_ref  ---------------------------------->
@@ -1685,8 +1844,9 @@ def save_ordinance():
 					location=location1+"/"+filename
 					path_location=location.replace("/", "\\\\");
 
-					insert2="insert into tbl_ordinance_file_committee set path='"+str(path_location)+"' , filename='"+str(file.filename.replace("'",""))+"' , ordinance_id='"+str(p['ordinance_id'])+"', committee_id='"+str(new_lst)+"'"
-					cud(insert2)
+					insert2="""insert into tbl_ordinance_file_committee set path=%s , filename=%s , ordinance_id=%s, committee_id=%s"""
+					insert2_params = [str(path_location), str(file.filename.replace("'","")), str(p['ordinance_id']), str(new_lst)]
+					cud_safe(insert2, insert2_params)
 
 			if str(split[0])=="file_veto":
 				z=z+1
@@ -1711,11 +1871,13 @@ def save_ordinance():
 					location=location1+"/"+filename
 					path_location=location.replace("/", "\\\\");
 
-					insert_veto="insert into tbl_veto_ordinance set filename='"+str(file.filename.replace("'",""))+"', path='"+str(path_location)+"', ordinance_id='"+str(p['ordinance_id'])+"'"
-					cud(insert_veto)
+					insert_veto="""insert into tbl_veto_ordinance set filename=%s, path=%s, ordinance_id=%s"""
+					insert_veto_params = [str(file.filename.replace("'","")), str(path_location), str(p['ordinance_id'])]
+					cud_safe(insert_veto, insert_veto_params)
 
-		sel_ord="select * from tbl_ordinance where ordinance_id='"+str(p['ordinance_id'])+"'"
-		rd_ordinance=pyread(sel_ord)
+		sel_ord="""select * from tbl_ordinance where ordinance_id=%s"""
+		sel_ord_params = [str(p['ordinance_id'])]
+		rd_ordinance=pyread_safe(sel_ord, sel_ord_params)
 
 		if p['status_ordinance']=="1":
 			doc_status = "Propose Ordinance"
@@ -1734,18 +1896,26 @@ def save_ordinance():
 		elif p['status_ordinance']=="8":
 			doc_status = "Archive Ordinance"
 
-		if p['tracking_no']:
+		if p.get('tracking_no'):
+			tracking_no = validate_string(p['tracking_no'], 50)
+			
+			# Get track_gen_id from tracking number (FIX: removed trailing comma)
 			select_tracking = """
-				select track_gen_id from tbl_document_tracking where tracking_no='"""+str(p['tracking_no'])+"""',
+				SELECT track_gen_id FROM tbl_document_tracking WHERE tracking_no=%s
 			"""
-			rd_sel_tracking = pyread(select_tracking)
+			rd_sel_tracking = pyread_safe(select_tracking, (tracking_no,))
 
-			insert_tracking_status = """
-				insert into tbl_document_tracking_status  set track_gen_id='"""+str(rd_sel_tracking[0]['track_gen_id'])+"""', status='Approved', date=now()
-			"""
-			cud(insert_tracking_status)
+			if rd_sel_tracking and len(rd_sel_tracking) > 0:
+				track_gen_id = validate_int(rd_sel_tracking[0].get('track_gen_id', 0))
+				
+				if track_gen_id > 0:
+					insert_tracking_status = """
+						INSERT INTO tbl_document_tracking_status (track_gen_id, status, date)
+						VALUES (%s, %s, NOW())
+					"""
+					cud_safe(insert_tracking_status, (track_gen_id, 'Approved'))
 
-		return jsonify("Succesfuly Updated")
+		return jsonify("Successfully Updated")
 
 
 @query.route('/get_petition_doc', methods=['GET', 'POST'])
@@ -1754,9 +1924,10 @@ def get_petition_doc():
 	p=json.loads(request.data)
 	sel="""
 		select * from tbl_petition_path tpp
-		where petition_id='"""+str(p['petition_id'])+"""'
+		where petition_id=%s
 	"""
-	rd=pyread(sel)
+	sel_params = [str(p['petition_id'])]
+	rd=pyread_safe(sel, sel_params)
 	return jsonify(rd)
 	
 
@@ -1767,9 +1938,10 @@ def get_documents_refferals_doc():
 	sel="""
 		select * from tbl_documents_refferals_path tdrp
 		
-		where documents_refferals_id='"""+str(p['documents_refferals_id'])+"""'
+		where documents_refferals_id=%s
 	"""
-	rd=pyread(sel)
+	sel_params = [str(p['documents_refferals_id'])]
+	rd=pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 @query.route('/get_barangay_ordinance_doc', methods=['GET', 'POST'])
@@ -1778,9 +1950,10 @@ def get_barangay_ordinance_doc():
 	p=json.loads(request.data)
 	sel="""
 		select * from tbl_barangay_ordinance_path tbop
-		where barangay_ordinance_id='"""+str(p['barangay_ordinance_id'])+"""'
+		where barangay_ordinance_id=%s
 	"""
-	rd=pyread(sel)
+	sel_params = [str(p['barangay_ordinance_id'])]
+	rd=pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 
@@ -1790,9 +1963,10 @@ def get_barangay_resolution_doc():
 	p=json.loads(request.data)
 	sel="""
 		select * from tbl_barangay_resolution_path tbrp
-		where barangay_resolution_id='"""+str(p['barangay_resolution_id'])+"""'
+		where barangay_resolution_id=%s
 	"""
-	rd=pyread(sel)
+	sel_params = [str(p['barangay_resolution_id'])]
+	rd=pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 @query.route('/get_executive_order_doc', methods=['GET', 'POST'])
@@ -1801,9 +1975,10 @@ def get_executive_order_doc():
 	p=json.loads(request.data)
 	sel="""
 		select * from tbl_executive_order_path teop
-		where executive_order_id='"""+str(p['executive_order_id'])+"""'
+		where executive_order_id=%s
 	"""
-	rd=pyread(sel)
+	sel_params = [str(p['executive_order_id'])]
+	rd=pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 @query.route('/get_memorandom_doc', methods=['GET', 'POST'])
@@ -1812,9 +1987,10 @@ def get_memorandom_doc():
 	p=json.loads(request.data)
 	sel="""
 		select * from tbl_memorandom_path tmp
-		where memorandom_id='"""+str(p['memorandom_id'])+"""'
+		where memorandom_id=%s
 	"""
-	rd=pyread(sel)
+	sel_params = [str(p['memorandom_id'])]
+	rd=pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 
@@ -1824,9 +2000,10 @@ def get_petition_path_id():
 	p=json.loads(request.data)
 	sel="""
 		select * from tbl_petition_path 
-		where petition_id='"""+str(p['petition_id'])+"""'
+		where petition_id=%s
 	"""
-	rd=pyread(sel)
+	sel_params = [str(p['petition_id'])]
+	rd=pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 @query.route('/save_session_', methods=['GET','POST'])
@@ -1845,92 +2022,104 @@ def save_session_():
 
 	if p['session_id']==0 or p['session_id']=='0':
 		check_session = """
-			select count(*) counter from tbl_session where session_number ='"""+str(p['session_number'])+"""'
+			select count(*) counter from tbl_session where session_number =%s
 		"""
-		rd = pyread(check_session)
+		check_session_params = [str(p['session_number'])]
+		rd = pyread_safe(check_session, check_session_params)
 
 		if rd[0]['counter']==0:
 			ins = """insert into tbl_session set 
-				session_number ='"""+str(p['session_number'])+"""',
-				session_date ='"""+str(p['session_date'])+"""',
-				session_opening_prayer='"""+str(p['opening_prayer'])+"""',
-				national_anthem='"""+str(p['national_anthem'])+"""',
-				closing_prayer='"""+str(p['closing_prayer_lead'])+"""',
-				sp_number='"""+str(p['sp_number'])+"""',
-				session_type='"""+str(p['sp_type'])+"""'
+				session_number =%s,
+				session_date =%s,
+				session_opening_prayer=%s,
+				national_anthem=%s,
+				closing_prayer=%s,
+				sp_number=%s,
+				session_type=%s
 			"""
-			ses_id = cud_callbackid(ins)
+			ins_params = [str(p['session_number']), str(p['session_date']), str(p['opening_prayer']), str(p['national_anthem']), str(p['closing_prayer_lead']), str(p['sp_number']), str(p['sp_type'])]
+			ses_id = cud_callbackid_safe(ins, ins_params)
 
 			if ses_id != 0:
 
 				if "reading_consid_prev_min" in p:
 					for x in p['reading_consid_prev_min']:
 						insert_reading_minutes = """
-							insert into tbl_session_reading_minutes set session_id='"""+str(ses_id)+"""', minutes_id='"""+str(x['minutes_id'])+"""'
+							insert into tbl_session_reading_minutes set session_id=%s, minutes_id=%s
 						"""
-						cud(insert_reading_minutes)
+						insert_reading_minutes_params = [str(ses_id), str(x['minutes_id'])]
+						cud_safe(insert_reading_minutes, insert_reading_minutes_params)
 
 				if "additional_refferals" in p:
 					for x in p['additional_refferals']:
 						print("2")
 						prnt_G(x)
 						insert_p_ref = """
-							insert into tbl_session_additional_refferal set session_id='"""+str(ses_id)+"""', tracking_no='"""+str(x['tracking_no'])+"""'
+							insert into tbl_session_additional_refferal set session_id=%s, tracking_no=%s
 						"""
-						cud(insert_p_ref)
+						insert_p_ref_params = [str(ses_id), str(x['tracking_no'])]
+						cud_safe(insert_p_ref, insert_p_ref_params)
 
 						insert_tracking_status = """
-							insert into tbl_document_tracking_status set track_gen_id='"""+str(x['tracking_no'])+"""', status='Calendared', date=now(),
-							remarks = '"""+str(remarks)+"""'
+							insert into tbl_document_tracking_status set track_gen_id=%s, status='Calendared', date=now(),
+							remarks = %s
 						"""
-						cud(insert_tracking_status)
+						insert_tracking_status_params = [str(x['tracking_no']), str(remarks)]
+						cud_safe(insert_tracking_status, insert_tracking_status_params)
 
 				if "propose_ord" in p:
 					for x in p['propose_ord']:
 						insert_p_ref = """
-							insert into tbl_session_proposed_ordi set session_id='"""+str(ses_id)+"""', tracking_no='"""+str(x['tracking_no'])+"""'
+							insert into tbl_session_proposed_ordi set session_id=%s, tracking_no=%s
 						"""
-						cud(insert_p_ref)
+						insert_p_ref_params = [str(ses_id), str(x['tracking_no'])]
+						cud_safe(insert_p_ref, insert_p_ref_params)
 
 						insert_tracking_status = """
-							insert into tbl_document_tracking_status set track_gen_id='"""+str(x['tracking_no'])+"""', status='Calendared', date=now(),
-							remarks = '"""+str(remarks)+"""'
+							insert into tbl_document_tracking_status set track_gen_id=%s, status='Calendared', date=now(),
+							remarks = %s
 						"""
-						cud(insert_tracking_status)
+						insert_tracking_status_params = [str(x['tracking_no']), str(remarks)]
+						cud_safe(insert_tracking_status, insert_tracking_status_params)
 
 				if "propose_reso" in p:
 					for x in p['propose_reso']:
 						insert_p_ref = """
-							insert into tbl_session_proposed_reso set session_id='"""+str(ses_id)+"""', tracking_no='"""+str(x['tracking_no'])+"""'
+							insert into tbl_session_proposed_reso set session_id=%s, tracking_no=%s
 						"""
-						cud(insert_p_ref)
+						insert_p_ref_params = [str(ses_id), str(x['tracking_no'])]
+						cud_safe(insert_p_ref, insert_p_ref_params)
 
 						insert_tracking_status = """
-							insert into tbl_document_tracking_status set track_gen_id='"""+str(x['tracking_no'])+"""', status='Calendared', date=now(),
-							remarks = '"""+str(remarks)+"""'
+							insert into tbl_document_tracking_status set track_gen_id=%s, status='Calendared', date=now(),
+							remarks = %s
 						"""
-						cud(insert_tracking_status)
+						insert_tracking_status_params = [str(x['tracking_no']), str(remarks)]
+						cud_safe(insert_tracking_status, insert_tracking_status_params)
 
 				if "petitions_for_refferals" in p:
 					for x in p['petitions_for_refferals']:
 						insert_p_ref = """
-							insert into tbl_session_petition_for_refferal set session_id='"""+str(ses_id)+"""',  tracking_no='"""+str(x['tracking_no'])+"""'
+							insert into tbl_session_petition_for_refferal set session_id=%s,  tracking_no=%s
 						"""
-						cud(insert_p_ref)
+						insert_p_ref_params = [str(ses_id), str(x['tracking_no'])]
+						cud_safe(insert_p_ref, insert_p_ref_params)
 
 						insert_tracking_status = """
-							insert into tbl_document_tracking_status set track_gen_id='"""+str(x['tracking_no'])+"""', status='Calendared', date=now(),
-							remarks = '"""+str(remarks)+"""'
+							insert into tbl_document_tracking_status set track_gen_id=%s, status='Calendared', date=now(),
+							remarks = %s
 						"""
-						cud(insert_tracking_status)
+						insert_tracking_status_params = [str(x['tracking_no']), str(remarks)]
+						cud_safe(insert_tracking_status, insert_tracking_status_params)
 
 
 				if "committee_report" in p:
 					for x in p['committee_report']:
 						insert_p_ref = """
-							insert into tbl_session_committee_report set session_id='"""+str(ses_id)+"""', committee_report_id='"""+str(x['committee_report_id'])+"""'
+							insert into tbl_session_committee_report set session_id=%s, committee_report_id=%s
 						"""
-						cud(insert_p_ref)
+						insert_p_ref_params = [str(ses_id), str(x['committee_report_id'])]
+						cud_safe(insert_p_ref, insert_p_ref_params)
 
 				if "unfinished_bussiness" in p:
 					committees = None
@@ -1959,17 +2148,19 @@ def save_session_():
 				if "bussiness_of_the_day" in p:
 					for x in p['bussiness_of_the_day']:
 						insert_p_ref = """
-							insert into tbl_session_botd set session_id='"""+str(ses_id)+"""', tracking_no='"""+str(x['tracking_no'])+"""'
+							insert into tbl_session_botd set session_id=%s, tracking_no=%s
 						"""
-						cud(insert_p_ref)
+						insert_p_ref_params = [str(ses_id), str(x['tracking_no'])]
+						cud_safe(insert_p_ref, insert_p_ref_params)
 				
 				if "question_hour" in p:
 					for x in p['question_hour']:
 						insert_question = """
-							insert into tbl_session_question_hour set fullname='"""+str(x['fullname'])+"""', designation='"""+str(x['designation'])+"""', office='"""+str(x['office'])+"""',
-							subject='"""+str(x['subject'])+"""', session_id='"""+str(ses_id)+"""'
+							insert into tbl_session_question_hour set fullname=%s, designation=%s, office=%s,
+							subject=%s, session_id=%s
 						"""
-						cud(insert_question)
+						insert_question_params = [str(x['fullname']), str(x['designation']), str(x['office']), str(x['subject']), str(ses_id)]
+						cud_safe(insert_question, insert_question_params)
 
 				# if 'privilege_hour'in p:
 				# 	for x in p['privilege_hour']:
@@ -2015,17 +2206,19 @@ def save_session_():
 								os.chdir(cwd)
 
 								insert_files= """
-									insert into tbl_session_privilege_path set filename='"""+str(file.filename.replace("'","''"))+"""', path='"""+str(path_location)+"""', session_id='"""+str(rd_ids)+"""'
+									insert into tbl_session_privilege_path set filename=%s, path=%s, session_id=%s
 								"""
-								cud(insert_files)
+								insert_files_params = [str(file.filename), str(path_location), str(rd_ids)]
+								cud_safe(insert_files, insert_files_params)
 
 				if 'announcement_'in p:
 					for x in p['announcement_']:
 						insert_announcement = """
-							insert into tbl_session_announcement set councilor='"""+str(x['info_id'])+"""', session_id='"""+str(ses_id)+"""',
-							announcement='"""+str(x['announcement'])+"""'
+							insert into tbl_session_announcement set councilor=%s, session_id=%s,
+							announcement=%s
 						"""
-						cud(insert_announcement)
+						insert_announcement_params = [str(x['info_id']), str(ses_id), str(x['announcement'])]
+						cud_safe(insert_announcement, insert_announcement_params)
 		
 		else:
 			return jsonify("session number already exists")
@@ -2033,97 +2226,116 @@ def save_session_():
 	else:
 		ins = """
 			update tbl_session set 
-			session_number ='"""+str(p['session_number'])+"""',
-			session_date ='"""+str(p['session_date'])+"""',
-			session_opening_prayer='"""+str(p['opening_prayer'])+"""',
-			national_anthem='"""+str(p['national_anthem'])+"""',
-			closing_prayer='"""+str(p['closing_prayer_lead'])+"""',
-			sp_number='"""+str(p['sp_number'])+"""',
-			session_type='"""+str(p['sp_type'])+"""'
-			where session_id = '"""+str(p['session_id'])+"""' 
+			session_number =%s,
+			session_date =%s,
+			session_opening_prayer=%s,
+			national_anthem=%s,
+			closing_prayer=%s,
+			sp_number=%s,
+			session_type=%s
+			where session_id = %s 
 		"""
-		cud(ins)
+		ins_params = [str(p['session_number']), str(p['session_date']), str(p['opening_prayer']), str(p['national_anthem']), str(p['closing_prayer_lead']), str(p['sp_number']), str(p['sp_type']), str(p['session_id'])]
+		cud_safe(ins, ins_params)
 
-		del_q =	"delete from tbl_session_reading_minutes where session_id = '"+str(p['session_id'])+"' "
-		cud(del_q)
+		del_q =	"""delete from tbl_session_reading_minutes where session_id = %s """
+		del_q_params = [str(p['session_id'])]
+		cud_safe(del_q, del_q_params)
 
-		del_q =	"delete from tbl_session_additional_refferal where session_id = '"+str(p['session_id'])+"' "
-		cud(del_q)
+		del_q =	"""delete from tbl_session_additional_refferal where session_id = %s """
+		del_q_params = [str(p['session_id'])]
+		cud_safe(del_q, del_q_params)
 
-		del_q =	"delete from tbl_session_proposed_ordi where session_id = '"+str(p['session_id'])+"' "
-		cud(del_q)
+		del_q =	"""delete from tbl_session_proposed_ordi where session_id = %s """
+		del_q_params = [str(p['session_id'])]
+		cud_safe(del_q, del_q_params)
 
-		del_q =	"delete from tbl_session_proposed_reso where session_id = '"+str(p['session_id'])+"' "
-		cud(del_q)
+		del_q =	"""delete from tbl_session_proposed_reso where session_id = %s """
+		del_q_params = [str(p['session_id'])]
+		cud_safe(del_q, del_q_params)
 
-		del_q =	"delete from tbl_session_petition_for_refferal where session_id = '"+str(p['session_id'])+"' "
-		cud(del_q)
+		del_q =	"""delete from tbl_session_petition_for_refferal where session_id = %s """
+		del_q_params = [str(p['session_id'])]
+		cud_safe(del_q, del_q_params)
 
-		del_q =	"delete from tbl_session_committee_report where session_id = '"+str(p['session_id'])+"' "
-		cud(del_q)
+		del_q =	"""delete from tbl_session_committee_report where session_id = %s """
+		del_q_params = [str(p['session_id'])]
+		cud_safe(del_q, del_q_params)
 
-		del_q =	"delete from tbl_session_unfinished_bussiness where session_id = '"+str(p['session_id'])+"' "
-		cud(del_q)
+		del_q =	"""delete from tbl_session_unfinished_bussiness where session_id = %s """
+		del_q_params = [str(p['session_id'])]
+		cud_safe(del_q, del_q_params)
 
-		del_q =	"delete from tbl_session_botd where session_id = '"+str(p['session_id'])+"' "
-		cud(del_q)
+		del_q =	"""delete from tbl_session_botd where session_id = %s """
+		del_q_params = [str(p['session_id'])]
+		cud_safe(del_q, del_q_params)
 
-		del_q =	"delete from tbl_session_question_hour where session_id = '"+str(p['session_id'])+"' "
-		cud(del_q)
+		del_q =	"""delete from tbl_session_question_hour where session_id = %s """
+		del_q_params = [str(p['session_id'])]
+		cud_safe(del_q, del_q_params)
 
-		del_q =	"delete from tbl_session_announcement where session_id = '"+str(p['session_id'])+"' "
-		cud(del_q)
+		del_q =	"""delete from tbl_session_announcement where session_id = %s """
+		del_q_params = [str(p['session_id'])]
+		cud_safe(del_q, del_q_params)
 
-		del_q =	"delete from tbl_session_previlege_hour where session_id = '"+str(p['session_id'])+"' "
-		cud(del_q)
+		del_q =	"""delete from tbl_session_previlege_hour where session_id = %s """
+		del_q_params = [str(p['session_id'])]
+		cud_safe(del_q, del_q_params)
 
 		if "reading_consid_prev_min" in p:
 			for x in p['reading_consid_prev_min']:
 				insert_reading_minutes = """
-					insert into tbl_session_reading_minutes set session_id='"""+str(p['session_id'])+"""', minutes_id='"""+str(x['minutes_id'])+"""'
+					insert into tbl_session_reading_minutes set session_id=%s, minutes_id=%s
 				"""
-				cud(insert_reading_minutes)
+				insert_reading_minutes_params = [str(p['session_id']), str(x['minutes_id'])]
+				cud_safe(insert_reading_minutes, insert_reading_minutes_params)
 
 		if "additional_refferals" in p:
 			for x in p['additional_refferals']:
 				if x:
 					insert_p_ref = """
-						insert into tbl_session_additional_refferal set session_id='"""+str(p['session_id'])+"""',  tracking_no='"""+str(x['tracking_no'])+"""'
+						insert into tbl_session_additional_refferal set session_id=%s,  tracking_no=%s
 					"""
-					cud(insert_p_ref)
+					insert_p_ref_params = [str(p['session_id']), str(x['tracking_no'])]
+					cud_safe(insert_p_ref, insert_p_ref_params)
 
 		if "propose_ord" in p:
 			for x in p['propose_ord']:
 				insert_p_ref = """
-					insert into tbl_session_proposed_ordi set session_id='"""+str(p['session_id'])+"""', tracking_no='"""+str(x['tracking_no'])+"""'
+					insert into tbl_session_proposed_ordi set session_id=%s, tracking_no=%s
 				"""
-				cud(insert_p_ref)
+				insert_p_ref_params = [str(p['session_id']), str(x['tracking_no'])]
+				cud_safe(insert_p_ref, insert_p_ref_params)
 
 		if "propose_reso" in p:
 			for x in p['propose_reso']:
 				insert_p_ref = """
-					insert into tbl_session_proposed_reso set session_id='"""+str(p['session_id'])+"""', tracking_no='"""+str(x['tracking_no'])+"""'
+					insert into tbl_session_proposed_reso set session_id=%s, tracking_no=%s
 				"""
-				cud(insert_p_ref)
+				insert_p_ref_params = [str(p['session_id']), str(x['tracking_no'])]
+				cud_safe(insert_p_ref, insert_p_ref_params)
 
 		if "petitions_for_refferals" in p:
 			for x in p['petitions_for_refferals']:
 				insert_p_ref = """
-					insert into tbl_session_petition_for_refferal set session_id='"""+str(p['session_id'])+"""',  tracking_no='"""+str(x['tracking_no'])+"""'
+					insert into tbl_session_petition_for_refferal set session_id=%s,  tracking_no=%s
 				"""
-				cud(insert_p_ref)
+				insert_p_ref_params = [str(p['session_id']), str(x['tracking_no'])]
+				cud_safe(insert_p_ref, insert_p_ref_params)
 
-				del_q =	"delete from tbl_document_tracking_refferal where track_gen_id = '"+str(x['tracking_no'])+"' "
-				cud(del_q)
+				del_q =	"""delete from tbl_document_tracking_refferal where track_gen_id = %s """
+				del_q_params = [str(x['tracking_no'])]
+				cud_safe(del_q, del_q_params)
 
 
 		if "committee_report" in p:
 			for x in p['committee_report']:
 				if x:
 					insert_p_ref = """
-						insert into tbl_session_committee_report set session_id='"""+str(p['session_id'])+"""', committee_report_id='"""+str(x['committee_report_id'])+"""'
+						insert into tbl_session_committee_report set session_id=%s, committee_report_id=%s
 					"""
-					cud(insert_p_ref)
+					insert_p_ref_params = [str(p['session_id']), str(x['committee_report_id'])]
+					cud_safe(insert_p_ref, insert_p_ref_params)
 
 		if "unfinished_bussiness" in p:
 			for x in p['unfinished_bussiness']:
@@ -2172,10 +2384,11 @@ def save_session_():
 			for x in p['question_hour']:
 				if x:
 					insert_question = """
-						insert into tbl_session_question_hour set fullname='"""+str(x['fullname'])+"""', designation='"""+str(x['designation'])+"""', office='"""+str(x['office'])+"""',
-						subject='"""+str(x['subject'])+"""', session_id='"""+str(p['session_id'])+"""'
+						insert into tbl_session_question_hour set fullname=%s, designation=%s, office=%s,
+						subject=%s, session_id=%s
 					"""
-					cud(insert_question)
+					insert_question_params = [str(x['fullname']), str(x['designation']), str(x['office']), str(x['subject']), str(p['session_id'])]
+					cud_safe(insert_question, insert_question_params)
 
 		if 'privilege_hour'in p:
 			for x in p['privilege_hour']:
@@ -2212,17 +2425,19 @@ def save_session_():
 						os.chdir(cwd)
 
 						insert_files= """
-							insert into tbl_session_privilege_path set filename='"""+str(file.filename.replace("'","''"))+"""', path='"""+str(path_location)+"""', session_id='"""+str(rd_ids)+"""'
+							insert into tbl_session_privilege_path set filename=%s, path=%s, session_id=%s
 						"""
-						cud(insert_files)
+						insert_files_params = [str(file.filename), str(path_location), str(rd_ids)]
+						cud_safe(insert_files, insert_files_params)
 
 		if 'announcement_'in p:
 			for x in p['announcement_']:
 				insert_announcement = """
-					insert into tbl_session_announcement set councilor='"""+str(x['info_id'])+"""', session_id='"""+str(p['session_id'])+"""',
-					announcement='"""+str(x['announcement'])+"""'
+					insert into tbl_session_announcement set councilor=%s, session_id=%s,
+					announcement=%s
 				"""
-				cud(insert_announcement)
+				insert_announcement_params = [str(x['info_id']), str(p['session_id']), str(x['announcement'])]
+				cud_safe(insert_announcement, insert_announcement_params)
 	
 	if p['session_id']==0 or p['session_id']=='0':
 		session_id = ses_id
@@ -2242,7 +2457,7 @@ def save_session_():
 		n_path.resolve()
 
 		if file and allowed_file(file.filename):
-			filename = str(custom_secure_filename(file.filename)).replace("'","''")
+			filename = str(custom_secure_filename(file.filename))
 			if not os.path.exists(n_path):
 				os.mkdir(n_path)
 				app.config['UPLOAD_FOLDER']=n_path
@@ -2255,63 +2470,69 @@ def save_session_():
 				location1="session_video/"+ str(f) + "/" + str(rd)
 				location1.replace("//", "\\\\");
 				location=location1+"/"+filename
-				path_location=location.replace("/", "\\\\").replace("'","''");
+				path_location=location.replace("/", "\\\\");
 				split_name = str(file.filename).split(".")
 
 				if f=='intro':
-					intro_path= path_location.replace("'","''")
+					intro_path= path_location
 				elif f=='national_anthem':
-					national_anthem_path = path_location.replace("'","''")
+					national_anthem_path = path_location
 				elif f=='prayer':
-					prayer_path = path_location.replace("'","''")
+					prayer_path = path_location
 			else:
 				location1="session_files/"+ str(f) + "/" + str(rd)
 				location1.replace("//", "\\\\");
 				location=location1+"//"+filename
-				path_location=location.replace("/", "\\\\").replace("'","''");
+				path_location=location.replace("/", "\\\\");
 				split_name = str(file.filename).split(".")
 
 				if f=='recitation_of_councilor':
 					insert_files= """
-						insert into tbl_session_recitation_path set filename='"""+str(file.filename.replace("'","''"))+"""', path='"""+str(path_location)+"""', session_id='"""+str(session_id)+"""'
+						insert into tbl_session_recitation_path set filename=%s, path=%s, session_id=%s
 					"""
-					cud(insert_files)
+					insert_files_params = [str(file.filename), str(path_location), str(session_id)]
+					cud_safe(insert_files, insert_files_params)
 
 				elif f=="announcement_file":
 					insert_files= """
-						insert into tbl_session_announcement_path set filename='"""+str(file.filename.replace("'","''"))+"""', path='"""+str(path_location)+"""', session_id='"""+str(session_id)+"""'
+						insert into tbl_session_announcement_path set filename=%s, path=%s, session_id=%s
 					"""
-					cud(insert_files)
+					insert_files_params = [str(file.filename), str(path_location), str(session_id)]
+					cud_safe(insert_files, insert_files_params)
 
 				elif f=="question_hour_file":
 					insert_files= """
-						insert into tbl_session_question_hour_path set filename='"""+str(file.filename.replace("'","''"))+"""', path='"""+str(path_location)+"""', session_id='"""+str(session_id)+"""'
+						insert into tbl_session_question_hour_path set filename=%s, path=%s, session_id=%s
 					"""
-					cud(insert_files)
+					insert_files_params = [str(file.filename), str(path_location), str(session_id)]
+					cud_safe(insert_files, insert_files_params)
 
 				# elif f=="privilege_hour_file":
 				# 	insert_files= """
-				# 		insert into tbl_session_privilege_path set filename='"""+str(file.filename.replace("'","''"))+"""', path='"""+str(path_location)+"""', session_id='"""+str(session_id)+"""'
+				# 		insert into tbl_session_privilege_path set filename='"""+str(file.filename)+"""', path='"""+str(path_location)+"""', session_id='"""+str(session_id)+"""'
 				# 	"""
 				# 	cud(insert_files)
 
 				elif f=="committee_report_file":
 					insert_files= """
-						insert into tbl_session_committee_report_path set filename='"""+str(file.filename.replace("'","''"))+"""', path='"""+str(path_location)+"""', session_id='"""+str(session_id)+"""'
+						insert into tbl_session_committee_report_path set filename=%s, path=%s, session_id=%s
 					"""
-					cud(insert_files)
+					insert_files_params = [str(file.filename), str(path_location), str(session_id)]
+					cud_safe(insert_files, insert_files_params)
 
 				elif f=="committee_information_file":
 					insert_files= """
-						insert into tbl_session_committee_information_path set filename='"""+str(file.filename.replace("'","''"))+"""', path='"""+str(path_location)+"""', session_id='"""+str(session_id)+"""'
+						insert into tbl_session_committee_information_path set filename=%s, path=%s, session_id=%s
 					"""
-					cud(insert_files)
+					insert_files_params = [str(file.filename), str(path_location), str(session_id)]
+					cud_safe(insert_files, insert_files_params)
 
 	if p['session_id']==0 or p['session_id']=='0':
 		insert_file_path= """
-			insert into tbl_session_video set intro_path='"""+str(intro_path)+"""' , national_anthem_path= '"""+str(national_anthem_path)+"""', prayer_path= '"""+str(prayer_path)+"""' , session_id ='"""+str(session_id)+"""'
+			insert into tbl_session_video set intro_path=%s , national_anthem_path= %s, prayer_path= %s , session_id =%s
 		"""
-		cud(insert_file_path)
+		insert_file_path_params = [str(intro_path), str(national_anthem_path), str(prayer_path), str(session_id)]
+		cud_safe(insert_file_path, insert_file_path_params)
 	else:
 		sel= """
 			select * from tbl_session_video where session_id =%s
@@ -2321,27 +2542,31 @@ def save_session_():
 
 		if len(rd)==0:
 			insert_file_path= """
-				insert into tbl_session_video set intro_path='"""+str(intro_path)+"""' , national_anthem_path= '"""+str(national_anthem_path)+"""', prayer_path= '"""+str(prayer_path)+"""' , session_id ='"""+str(session_id)+"""'
+				insert into tbl_session_video set intro_path=%s , national_anthem_path= %s, prayer_path= %s , session_id =%s
 			"""
-			cud(insert_file_path)
+			insert_file_path_params = [str(intro_path), str(national_anthem_path), str(prayer_path), str(session_id)]
+			cud_safe(insert_file_path, insert_file_path_params)
 		else:
 			if intro_path!=None:
 				update_file_path= """
-					update tbl_session_video set intro_path='"""+str(intro_path)+"""' where session_id ='"""+str(session_id)+"""'
+					update tbl_session_video set intro_path=%s where session_id =%s
 				"""
-				cud(update_file_path)
+				update_file_path_params = [str(intro_path), str(session_id)]
+				cud_safe(update_file_path, update_file_path_params)
 			
 			if national_anthem_path!=None:
 				update_file_path2= """
-					update tbl_session_video set national_anthem_path= '"""+str(national_anthem_path)+"""' where session_id ='"""+str(session_id)+"""'
+					update tbl_session_video set national_anthem_path= %s where session_id =%s
 				"""
-				cud(update_file_path2)
+				update_file_path2_params = [str(national_anthem_path), str(session_id)]
+				cud_safe(update_file_path2, update_file_path2_params)
 
 			if prayer_path!=None:
 				update_file_path3= """
-					update tbl_session_video set prayer_path= '"""+str(prayer_path)+"""' where session_id ='"""+str(session_id)+"""'
+					update tbl_session_video set prayer_path= %s where session_id =%s
 				"""
-				cud(update_file_path3)
+				update_file_path3_params = [str(prayer_path), str(session_id)]
+				cud_safe(update_file_path3, update_file_path3_params)
 
 	return jsonify("Succesfuly Saved")
 
@@ -2350,9 +2575,10 @@ def save_session_():
 def get_session_question_hour():
 	p=json.loads(request.data)
 	sel = """
-		select * from tbl_session_question_hour where session_id='"""+str(p['session_id'])+"""'
+		select * from tbl_session_question_hour where session_id=%s
 	"""
-	rd= pyread(sel)
+	sel_params = [str(p['session_id'])]
+	rd= pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 @query.route('/get_session_committee_report', methods=['GET', 'POST'])
@@ -2362,9 +2588,10 @@ def get_session_committee_report():
 	sel = """
 		select tscr.committee_report_id, tcr.subject from tbl_session_committee_report tscr
 		left join tbl_committee_report tcr on tcr.id=tscr.committee_report_id
-		where session_id='"""+str(p['session_id'])+"""'
+		where session_id=%s
 	"""
-	rd= pyread(sel)
+	sel_params = [str(p['session_id'])]
+	rd= pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 @query.route('/get_session_committee_information', methods=['GET', 'POST'])
@@ -2375,9 +2602,10 @@ def get_session_committee_information():
 		select tsci.committee_id, committee, committee_information_no
 		from tbl_session_committee_information tsci
 		left join tbl_committee tc on tc.committee_id=tsci.committee_id
-		where session_id='"""+str(p['session_id'])+"""'
+		where session_id=%s
 	"""
-	rd= pyread(sel)
+	sel_params = [str(p['session_id'])]
+	rd= pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 
@@ -2389,9 +2617,10 @@ def get_session_previlege_hour():
 		select info_id, concat(tpi.f_name,' ', tpi.m_name,' ', tpi.l_name) fullname
 		from tbl_session_previlege_hour tsph
 		left join tbl_personal_info tpi on tpi.info_id=tsph.councilor_info_id
-		where session_id='"""+str(p['session_id'])+"""'
+		where session_id=%s
 	"""
-	rd= pyread(sel)
+	sel_params = [str(p['session_id'])]
+	rd= pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 # @query.route('/get_session_privous_minutes', methods=['GET', 'POST'])
@@ -2420,9 +2649,10 @@ def get_session_privous_minutes():
 def get_session_proposed_ordi():
 	p=json.loads(request.data)
 	sel = """
-		select * from tbl_session_proposed_ordi where session_id='"""+str(p['session_id'])+"""'
+		select * from tbl_session_proposed_ordi where session_id=%s
 	"""
-	rd= pyread(sel)
+	sel_params = [str(p['session_id'])]
+	rd= pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 @query.route('/get_session_proposed_reso', methods=['GET', 'POST'])
@@ -2430,9 +2660,10 @@ def get_session_proposed_ordi():
 def get_session_proposed_reso():
 	p=json.loads(request.data)
 	sel = """
-		select * from tbl_session_proposed_reso where session_id='"""+str(p['session_id'])+"""'
+		select * from tbl_session_proposed_reso where session_id=%s
 	"""
-	rd= pyread(sel)
+	sel_params = [str(p['session_id'])]
+	rd= pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 @query.route('/get_session_petition_for_refferal', methods=['GET', 'POST'])
@@ -2442,9 +2673,10 @@ def get_session_petition_for_refferal():
 	sel = """
 		select * from tbl_session_petition_for_refferal tspfr
 		left join tbl_document_tracking_refferal tdtr on tdtr.track_gen_id=tspfr.tracking_no 
-		where session_id='"""+str(p['session_id'])+"""'
+		where session_id=%s
 	"""
-	rd= pyread(sel)
+	sel_params = [str(p['session_id'])]
+	rd= pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 @query.route('/get_session_additional_refferal', methods=['GET', 'POST'])
@@ -2454,9 +2686,10 @@ def get_session_additional_refferal():
 	sel = """
 		select * from tbl_session_additional_refferal tsar
 		left join tbl_document_tracking_refferal tdtr on tdtr.track_gen_id=tsar.tracking_no 
-		where session_id='"""+str(p['session_id'])+"""' group by tsar.id
+		where session_id=%s group by tsar.id
 	"""
-	rd= pyread(sel)
+	sel_params = [str(p['session_id'])]
+	rd= pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 @query.route('/get_session_code_ref', methods=['GET', 'POST'])
@@ -2464,9 +2697,10 @@ def get_session_additional_refferal():
 def get_session_code_ref():
 	p=json.loads(request.data)
 	sel = """
-		select * from tbl_session_code_ref where session_id='"""+str(p['session_id'])+"""'
+		select * from tbl_session_code_ref where session_id=%s
 	"""
-	rd= pyread(sel)
+	sel_params = [str(p['session_id'])]
+	rd= pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 @query.route('/get_session_announcement', methods=['GET', 'POST'])
@@ -2474,9 +2708,10 @@ def get_session_code_ref():
 def get_session_announcement():
 	p=json.loads(request.data)
 	sel = """
-		select * from tbl_session_announcement where session_id='"""+str(p['session_id'])+"""'
+		select * from tbl_session_announcement where session_id=%s
 	"""
-	rd= pyread(sel)
+	sel_params = [str(p['session_id'])]
+	rd= pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 @query.route('/get_session_summary_correction', methods=['GET', 'POST'])
@@ -2484,9 +2719,10 @@ def get_session_announcement():
 def get_session_summary_correction():
 	p=json.loads(request.data)
 	sel = """
-		select * from tbl_session_summary_correction where session_id='"""+str(p['session_id'])+"""'
+		select * from tbl_session_summary_correction where session_id=%s
 	"""
-	rd= pyread(sel)
+	sel_params = [str(p['session_id'])]
+	rd= pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 
@@ -2495,9 +2731,10 @@ def get_session_summary_correction():
 def get_session_bussiness_third():
 	p=json.loads(request.data)
 	sel = """
-		select * from tbl_session_bussiness_third where session_id='"""+str(p['session_id'])+"""'
+		select * from tbl_session_bussiness_third where session_id=%s
 	"""
-	rd= pyread(sel)
+	sel_params = [str(p['session_id'])]
+	rd= pyread_safe(sel, sel_params)
 	return jsonify(rd)
 	
 
@@ -2506,9 +2743,10 @@ def get_session_bussiness_third():
 def get_session_new_measure():
 	p=json.loads(request.data)
 	sel = """
-		select * from tbl_session_new_measure where session_id='"""+str(p['session_id'])+"""'
+		select * from tbl_session_new_measure where session_id=%s
 	"""
-	rd= pyread(sel)
+	sel_params = [str(p['session_id'])]
+	rd= pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 @query.route('/get_session_calendar_measure', methods=['GET', 'POST'])
@@ -2516,9 +2754,10 @@ def get_session_new_measure():
 def get_session_calendar_measure():
 	p=json.loads(request.data)
 	sel = """
-		select * from tbl_session_calendar_measure where session_id='"""+str(p['session_id'])+"""'
+		select * from tbl_session_calendar_measure where session_id=%s
 	"""
-	rd= pyread(sel)
+	sel_params = [str(p['session_id'])]
+	rd= pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 @query.route('/get_session_just_inserted', methods=['GET', 'POST'])
@@ -2526,9 +2765,10 @@ def get_session_calendar_measure():
 def get_session_just_inserted():
 	p=json.loads(request.data)
 	sel = """
-		select * from tbl_session_just_inserted where session_id='"""+str(p['session_id'])+"""'
+		select * from tbl_session_just_inserted where session_id=%s
 	"""
-	rd= pyread(sel)
+	sel_params = [str(p['session_id'])]
+	rd= pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 @query.route('/get_session_urgent', methods=['GET', 'POST'])
@@ -2536,9 +2776,10 @@ def get_session_just_inserted():
 def get_session_urgent():
 	p=json.loads(request.data)
 	sel = """
-		select * from tbl_session_urgent where session_id='"""+str(p['session_id'])+"""'
+		select * from tbl_session_urgent where session_id=%s
 	"""
-	rd= pyread(sel)
+	sel_params = [str(p['session_id'])]
+	rd= pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 @query.route('/get_session_unfinished_bussiness', methods=['GET', 'POST'])
@@ -2568,9 +2809,10 @@ def get_session_botd():
 def get_session_veto_reading():
 	p=json.loads(request.data)
 	sel = """
-		select * from tbl_session_veto_reading where session_id='"""+str(p['session_id'])+"""'
+		select * from tbl_session_veto_reading where session_id=%s
 	"""
-	rd= pyread(sel)
+	sel_params = [str(p['session_id'])]
+	rd= pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 @query.route('/get_minutes', methods=['GET', 'POST'])
@@ -2580,6 +2822,7 @@ def get_minutes():
 		select *, concat(tm.minutes_no,' ', ts.sp_title) title from tbl_minutes tm
 		left join tbl_sp ts on ts.sp_id=tm.sp_id
 		where status='ACTIVE'
+		order by tm.date desc, tm.minutes_id desc
 	"""
 	rd=pyread(sel)
 	return jsonify(rd)
@@ -2589,8 +2832,9 @@ def get_minutes():
 @login_required
 def del_minutes():
 	p=json.loads(request.data)
-	delete="delete from tbl_minutes where minutes_id='"+str(p['minutes_id'])+"'"
-	cud(delete)
+	delete="""delete from tbl_minutes where minutes_id=%s"""
+	delete_params = [str(p['minutes_id'])]
+	cud_safe(delete, delete_params)
 	n_path = Path(__file__).parent / "../static/uploads/upload_files_minutes" / str(p['minutes_id'])
 	n_path.resolve()
 	if Path.exists(n_path):
@@ -2608,35 +2852,55 @@ def save_minutes():
 
 	min_id = 0 ;
 
+	# prevent duplicate minutes entries for the same term / session number / type
+	dup_q="""
+		select minutes_id from tbl_minutes
+		where sp_id=%s
+		and minutes_no=%s
+		and type=%s
+		and minutes_id<>%s
+	"""
+	dup_q_params = [str(p['sp_id']), str(p['minutes_no']), str(p['type_minutes']), str(p['minutes_id'])]
+	if pyread_safe(dup_q, dup_q_params):
+		return jsonify({"message":"Minutes with the same Term, Session Number and Type already exists"}), 409
+
+
 	if str(p['minutes_id'])==0 or str(p['minutes_id'])=="0":
 		insert="""
-			insert into tbl_minutes set type='"""+str(p['type_minutes'])+"""' ,date='"""+str(p['date'])+"""',
-		 	minutes_no='"""+str(p['minutes_no'])+"""', sp_id='"""+str(p['sp_id'])+"""'
+			insert into tbl_minutes set type=%s ,date=%s,
+		 	minutes_no=%s, sp_id=%s
 		"""
-		rd=cud_callbackid(insert)
+		insert_params = [str(p['type_minutes']), str(p['date']), str(p['minutes_no']), str(p['sp_id'])]
+		rd=cud_callbackid_safe(insert, insert_params)
 		min_id = rd
 
 	else:
 		update="""
-			update tbl_minutes set type='"""+str(p['type_minutes'])+"""' ,date='"""+str(p['date'])+"""', 
-			minutes_no='"""+str(p['minutes_no'])+"""', sp_id='"""+str(p['sp_id'])+"""'
-			where minutes_id='"""+str(p['minutes_id'])+"""'
+			update tbl_minutes set type=%s ,date=%s, 
+			minutes_no=%s, sp_id=%s
+			where minutes_id=%s
 		"""
-		cud(update)
+		update_params = [str(p['type_minutes']), str(p['date']), str(p['minutes_no']), str(p['sp_id']), str(p['minutes_id'])]
+		cud_safe(update, update_params)
 
 		min_id = p['minutes_id']
 
-		delete_movant="delete from tbl_minutes_movant where minutes_id='"+str(p['minutes_id'])+"'"
-		cud(delete_movant)
+		delete_movant="""delete from tbl_minutes_movant where minutes_id=%s"""
+		delete_movant_params = [str(p['minutes_id'])]
+		cud_safe(delete_movant, delete_movant_params)
 
-		delete_seconder="delete from tbl_minutes_seconder where minutes_id='"+str(p['minutes_id'])+"'"
-		cud(delete_seconder)
+		delete_seconder="""delete from tbl_minutes_seconder where minutes_id=%s"""
+		delete_seconder_params = [str(p['minutes_id'])]
+		cud_safe(delete_seconder, delete_seconder_params)
 
 
 	for filename_array in request.files:
 		file=request.files[filename_array]
 
 		f = filename_array.split("[")[0]
+
+		if f not in ('file','file2'):
+			continue
 
 		if f=='file':
 			n_path = Path(__file__).parent / "../static/uploads/upload_files_minutes" / str(min_id)
@@ -2662,8 +2926,9 @@ def save_minutes():
 				location=location1+"/"+filename
 				path_location=location.replace("/", "\\\\");
 
-				insert2="insert into tbl_minutes_path set filename='"+str(file.filename.replace("'","''"))+"' ,path='"+str(path_location.replace("'","''"))+"', minutes_id='"+str(min_id)+"'"
-				cud(insert2)
+				insert2="""insert into tbl_minutes_path set filename=%s ,path=%s, minutes_id=%s"""
+				insert2_params = [str(file.filename), str(path_location), str(min_id)]
+				cud_safe(insert2, insert2_params)
 
 			if f=='file2':
 				location1="upload_files_minutes2//"+str(min_id)
@@ -2671,8 +2936,9 @@ def save_minutes():
 				location=location1+"/"+filename
 				path_location=location.replace("/", "\\\\");
 
-				insert2="insert into tbl_minutes_raw_path set filename='"+str(file.filename.replace("'","''"))+"' ,path='"+str(path_location.replace("'","''"))+"', minutes_id='"+str(min_id)+"'"
-				cud(insert2)
+				insert2="""insert into tbl_minutes_raw_path set filename=%s ,path=%s, minutes_id=%s"""
+				insert2_params = [str(file.filename), str(path_location), str(min_id)]
+				cud_safe(insert2, insert2_params)
 
 	return jsonify("Succesfuly Saved")
 
@@ -2685,9 +2951,10 @@ def get_minutes_doc():
 		select *,tc.committee_id committee_ids from tbl_minutes_path tmp
 		left join tbl_minutes tm on tm.minutes_id=tmp.minutes_id
 		left join tbl_committee tc on tc.committee_id=tm.committee_id
-		where tm.minutes_id='"""+str(p['minutes_id'])+"""'
+		where tm.minutes_id=%s
 	"""
-	rd=pyread(sel)
+	sel_params = [str(p['minutes_id'])]
+	rd=pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 @query.route('/get_minutes_doc2', methods=['GET', 'POST'])
@@ -2698,9 +2965,10 @@ def get_minutes_doc2():
 		select *,tc.committee_id committee_ids from tbl_minutes_raw_path tmp
 		left join tbl_minutes tm on tm.minutes_id=tmp.minutes_id
 		left join tbl_committee tc on tc.committee_id=tm.committee_id
-		where tm.minutes_id='"""+str(p['minutes_id'])+"""'
+		where tm.minutes_id=%s
 	"""
-	rd=pyread(sel)
+	sel_params = [str(p['minutes_id'])]
+	rd=pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 
@@ -2710,9 +2978,10 @@ def get_committee_reports_doc():
 	p=json.loads(request.data)
 	sel="""
 		select * from tbl_committee_reports_path tcrp
-		where committee_reports_id='"""+str(p['committee_reports_id'])+"""'
+		where committee_reports_id=%s
 	"""
-	rd=pyread(sel)
+	sel_params = [str(p['committee_reports_id'])]
+	rd=pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 
@@ -2729,10 +2998,11 @@ def get_ordinance_by_status():
 		left join tbl_committee tc on tc.committee_id=tcro.committee_id
 		left join tbl_ordinance_status_numbers tosn on tosn.ordinance_id=tbo.ordinance_id
 		left join tbl_minutes tm on tm.minutes_id=tbo.minutes_id
-		WHERE tbo.ordinance_id='"""+str(p['ordinance_id'])+"""'
+		WHERE tbo.ordinance_id=%s
 		GROUP BY tbo.ordinance_id ORDER BY tcro.committee_ref_id DESC
 	"""
-	rd=pyread(sel)
+	sel_params = [str(p['ordinance_id'])]
+	rd=pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 
@@ -2744,10 +3014,11 @@ def get_ordinance_attach_file():
 		select * from tbl_ordinance tbo
 		inner join tbl_ordinance_file_committee tofc on tofc.ordinance_id=tbo.ordinance_id
 		left join tbl_committee_ref_ordinance tcro on tcro.ordinance_id=tbo.ordinance_id
-		where tofc.committee_id='"""+str(p['committee_id'])+"""'
+		where tofc.committee_id=%s
 		group by tofc.ordinance_file_committee_id
 	"""
-	rd=pyread(sel)
+	sel_params = [str(p['committee_id'])]
+	rd=pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 @query.route('/get_ordinance_minutes', methods=['GET', 'POST'])
@@ -2757,9 +3028,10 @@ def get_ordinance_minutes():
 	sel="""
 		select * from tbl_minutes_path_committee_ordinance tmpco
 		left join tbl_ordinance tbo on tbo.ordinance_id=tmpco.ordinance_id
-		where tmpco.committee_id='"""+str(p['committee_id'])+"""' and tmpco.ordinance_id='"""+str(p['ordinance_id'])+"""'
+		where tmpco.committee_id=%s and tmpco.ordinance_id=%s
 	"""
-	rd=pyread(sel)
+	sel_params = [str(p['committee_id']), str(p['ordinance_id'])]
+	rd=pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 
@@ -2805,8 +3077,9 @@ def save_committee_reports():
 				
 			os.chdir(cwd)
 
-			insert2="insert into tbl_committee_reports_file set path='"+str(path_location)+"' , filename='"+str(filename.replace("'",""))+"' , committee_reports_id='"+str(ids)+"'"
-			cud(insert2)
+			insert2="""insert into tbl_committee_reports_file set path=%s , filename=%s , committee_reports_id=%s"""
+			insert2_params = [str(path_location), str(filename.replace("'","")), str(ids)]
+			cud_safe(insert2, insert2_params)
 	else:
 		update = """
 			update  tbl_committee_report set tracking_number=%s, subject=%s,
@@ -2843,8 +3116,9 @@ def save_committee_reports():
 				
 			os.chdir(cwd)
 
-			insert2="insert into tbl_committee_reports_file set path='"+str(path_location)+"' , filename='"+str(filename.replace("'",""))+"' , committee_reports_id='"+str(p['h_committee_report_id'])+"'"
-			cud(insert2)
+			insert2="""insert into tbl_committee_reports_file set path=%s , filename=%s , committee_reports_id=%s"""
+			insert2_params = [str(path_location), str(filename.replace("'","")), str(p['h_committee_report_id'])]
+			cud_safe(insert2, insert2_params)
 
 	return jsonify("Succesfuly Saved")
 
@@ -2857,11 +3131,12 @@ def save_committee_information():
 
 	if p['h_committee_information_id']=='0':
 		insert = """
-			insert into tbl_committee_information set tracking_number='"""+str(p['tracking_number'])+"""', subject='"""+str(p['subject'])+"""',
-			committee_number='"""+str(p['committee_number'])+"""', committee_id='"""+str(p['committee_id'])+"""', 
-			date_reffered='"""+str(p['date_reffered'])+"""', sp_id = '"""+str(p['sp_id'])+"""'
+			insert into tbl_committee_information set tracking_number=%s, subject=%s,
+			committee_number=%s, committee_id=%s, 
+			date_reffered=%s, sp_id = %s
 		"""
-		ids = cud_callbackid(insert)
+		insert_params = [str(p['tracking_number']), str(p['subject']), str(p['committee_number']), str(p['committee_id']), str(p['date_reffered']), str(p['sp_id'])]
+		ids = cud_callbackid_safe(insert, insert_params)
 
 		for filename_array in request.files:
 			file=request.files[filename_array]
@@ -2888,16 +3163,18 @@ def save_committee_information():
 				
 			os.chdir(cwd)
 
-			insert2="insert into tbl_committee_information_file set path='"+str(path_location)+"' , filename='"+str(filename.replace("'",""))+"' , committee_information_id='"+str(ids)+"'"
-			cud(insert2)
+			insert2="""insert into tbl_committee_information_file set path=%s , filename=%s , committee_information_id=%s"""
+			insert2_params = [str(path_location), str(filename.replace("'","")), str(ids)]
+			cud_safe(insert2, insert2_params)
 	else:
 		update = """
-			update  tbl_committee_information set tracking_number='"""+str(p['tracking_number'])+"""', subject='"""+str(p['subject'])+"""',
-			committee_number='"""+str(p['committee_number'])+"""', committee_id='"""+str(p['committee_id'])+"""',
-			date_reffered='"""+str(p['date_reffered'])+"""' , sp_id = '"""+str(p['sp_id'])+"""'
-			where id='"""+str(p['h_committee_information_id'])+"""'
+			update  tbl_committee_information set tracking_number=%s, subject=%s,
+			committee_number=%s, committee_id=%s,
+			date_reffered=%s , sp_id = %s
+			where id=%s
 		"""
-		cud(update)
+		update_params = [str(p['tracking_number']), str(p['subject']), str(p['committee_number']), str(p['committee_id']), str(p['date_reffered']), str(p['sp_id']), str(p['h_committee_information_id'])]
+		cud_safe(update, update_params)
 
 		for filename_array in request.files:
 			file=request.files[filename_array]
@@ -2924,8 +3201,9 @@ def save_committee_information():
 				
 			os.chdir(cwd)
 
-			insert2="insert into tbl_committee_information_file set path='"+str(path_location)+"' , filename='"+str(filename)+"' , committee_information_id='"+str(p['h_committee_information_id'])+"'"
-			cud(insert2)
+			insert2="""insert into tbl_committee_information_file set path=%s , filename=%s , committee_information_id=%s"""
+			insert2_params = [str(path_location), str(filename), str(p['h_committee_information_id'])]
+			cud_safe(insert2, insert2_params)
 
 	return jsonify("Succesfuly Saved")
 
@@ -2961,9 +3239,10 @@ def get_all_committee_information():
 def get_committee_reports_file():
 	p = json.loads(request.data)
 	sel= """
-		select * from tbl_committee_reports_file where committee_reports_id='"""+str(p['committee_reports_id'])+"""'
+		select * from tbl_committee_reports_file where committee_reports_id=%s
 	"""
-	rd = pyread(sel)
+	sel_params = [str(p['committee_reports_id'])]
+	rd = pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 @query.route('/get_committee_information_file', methods=['GET', 'POST'])
@@ -2971,9 +3250,10 @@ def get_committee_reports_file():
 def get_committee_information_file():
 	p = json.loads(request.data)
 	sel= """
-		select * from tbl_committee_information_file where committee_information_id='"""+str(p['committee_information_id'])+"""'
+		select * from tbl_committee_information_file where committee_information_id=%s
 	"""
-	rd = pyread(sel)
+	sel_params = [str(p['committee_information_id'])]
+	rd = pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 
@@ -2982,9 +3262,10 @@ def get_committee_information_file():
 def get_committee_minutes_file():
 	p = json.loads(request.data)
 	sel= """
-		select * from tbl_committee_minutes_file where committee_minutes_id='"""+str(p['committee_minutes_id'])+"""'
+		select * from tbl_committee_minutes_file where committee_minutes_id=%s
 	"""
-	rd = pyread(sel)
+	sel_params = [str(p['committee_minutes_id'])]
+	rd = pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 
@@ -2992,8 +3273,9 @@ def get_committee_minutes_file():
 @login_required
 def delete_committee_report_file():
 	p = json.loads(request.data)
-	delete = "delete from tbl_committee_reports_file where id='"+str(p['id'])+"'"
-	cud(delete)
+	delete = """delete from tbl_committee_reports_file where id=%s"""
+	delete_params = [str(p['id'])]
+	cud_safe(delete, delete_params)
 	return jsonify("Succesfuly Deleted")
 
 
@@ -3001,40 +3283,45 @@ def delete_committee_report_file():
 @login_required
 def delete_committee_information_file():
 	p = json.loads(request.data)
-	delete = "delete from tbl_committee_information_file where id='"+str(p['id'])+"'"
-	cud(delete)
+	delete = """delete from tbl_committee_information_file where id=%s"""
+	delete_params = [str(p['id'])]
+	cud_safe(delete, delete_params)
 	return jsonify("Succesfuly Deleted")
 
 @query.route('/delete_committee_minutes_file', methods=['GET', 'POST'])
 @login_required
 def delete_committee_minutes_file():
 	p = json.loads(request.data)
-	delete = "delete from tbl_committee_minutes_file where id='"+str(p['id'])+"'"
-	cud(delete)
+	delete = """delete from tbl_committee_minutes_file where id=%s"""
+	delete_params = [str(p['id'])]
+	cud_safe(delete, delete_params)
 	return jsonify("Succesfuly Deleted")
 
 @query.route('/delete_committee_report', methods=['GET', 'POST'])
 @login_required
 def delete_committee_report():
 	p = json.loads(request.data)
-	delete = "delete from tbl_committee_report where id='"+str(p['id'])+"'"
-	cud(delete)
+	delete = """delete from tbl_committee_report where id=%s"""
+	delete_params = [str(p['id'])]
+	cud_safe(delete, delete_params)
 	return jsonify("Succesfuly Deleted")
 
 @query.route('/delete_committee_information', methods=['GET', 'POST'])
 @login_required
 def delete_committee_information():
 	p = json.loads(request.data)
-	delete = "delete from tbl_committee_information where id='"+str(p['id'])+"'"
-	cud(delete)
+	delete = """delete from tbl_committee_information where id=%s"""
+	delete_params = [str(p['id'])]
+	cud_safe(delete, delete_params)
 	return jsonify("Succesfuly Deleted")
 
 @query.route('/delete_committee_minutes', methods=['GET', 'POST'])
 @login_required
 def delete_committee_minutes():
 	p = json.loads(request.data)
-	delete = "delete from tbl_committee_minutes where id='"+str(p['id'])+"'"
-	cud(delete)
+	delete = """delete from tbl_committee_minutes where id=%s"""
+	delete_params = [str(p['id'])]
+	cud_safe(delete, delete_params)
 	return jsonify("Succesfuly Deleted")
 
 @query.route('/get_all_committee_minutes', methods=['GET', 'POST'])
@@ -3081,24 +3368,27 @@ def get_all_committee_minutes():
 @login_required
 def get_file_path_minute():
 	p=json.loads(request.data)
-	sel="select * from tbl_minutes_path_committee_petition where minutes_path_committee_petition_id='"+str(p['minutes_path_committee_petition_id'])+"'"
-	rd=pyread(sel)
+	sel="""select * from tbl_minutes_path_committee_petition where minutes_path_committee_petition_id=%s"""
+	sel_params = [str(p['minutes_path_committee_petition_id'])]
+	rd=pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 @query.route('/get_file_path_minutes_ordinance', methods=['GET', 'POST'])
 @login_required
 def get_file_path_minutes_ordinance():
 	p=json.loads(request.data)
-	sel="select * from tbl_minutes_path_committee_ordinance where ordinance_minutes_committee_id='"+str(p['ordinance_minutes_committee_id'])+"'"
-	rd=pyread(sel)
+	sel="""select * from tbl_minutes_path_committee_ordinance where ordinance_minutes_committee_id=%s"""
+	sel_params = [str(p['ordinance_minutes_committee_id'])]
+	rd=pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 @query.route('/get_file_path_minutes_resolution', methods=['GET', 'POST'])
 @login_required
 def get_file_path_minutes_resolution():
 	p=json.loads(request.data)
-	sel="select * from tbl_minutes_path_committee_resolution where minutes_path_committee_resolution_id='"+str(p['minutes_path_committee_resolution_id'])+"'"
-	rd=pyread(sel)
+	sel="""select * from tbl_minutes_path_committee_resolution where minutes_path_committee_resolution_id=%s"""
+	sel_params = [str(p['minutes_path_committee_resolution_id'])]
+	rd=pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 
@@ -3109,9 +3399,10 @@ def get_ordinance_id_by_committee_ordinance_id():
 	if p:
 		if p['committee_ordinance_id']!="":
 			sel="""
-				select ordinance_id from tbl_committee_ordinance where committee_ordinance_id='"""+str(p['committee_ordinance_id'])+"""'
+				select ordinance_id from tbl_committee_ordinance where committee_ordinance_id=%s
 			"""
-			rd=pyread(sel)
+			sel_params = [str(p['committee_ordinance_id'])]
+			rd=pyread_safe(sel, sel_params)
 			return jsonify(rd)
 	else:
 		return jsonify("error")
@@ -3124,10 +3415,11 @@ def get_committee_ordinance_reports_file_for_del():
 	sel="""
 		select * ,tcro.committee_id committee_ids from tbl_committee_ref_ordinance tcro
 		left join tbl_ordinance_file_committee tofc on tofc.committee_id=tcro.committee_id
-		where tcro.committee_id='"""+str(p['committee_id'])+"""'  and
-		tcro.ordinance_id='"""+str(p['ordinance_id'])+"""'
+		where tcro.committee_id=%s  and
+		tcro.ordinance_id=%s
 	"""
-	rd=pyread(sel)
+	sel_params = [str(p['committee_id']), str(p['ordinance_id'])]
+	rd=pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 @query.route('/get_committee_resolution_reports_file', methods=['GET', 'POST'])
@@ -3137,10 +3429,11 @@ def get_committee_resolution_reports_file():
 	sel="""
 		select *,tcrr.committee_id committee_ids from tbl_committee_ref_resolution tcrr
         left join tbl_resolution_file trf on trf.resolution_id=tcrr.resolution_id
-		where committee_resolution_id='"""+str(p['committee_resolution_id'])+"""' 
-		and tcrr.date_reffered='"""+str(p['date_reffered'])+"""'
+		where committee_resolution_id=%s 
+		and tcrr.date_reffered=%s
 	"""
-	rd=pyread(sel)
+	sel_params = [str(p['committee_resolution_id']), str(p['date_reffered'])]
+	rd=pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 @query.route('/get_committee_resolution_reports_file_for_del', methods=['GET', 'POST'])
@@ -3150,10 +3443,11 @@ def get_committee_resolution_reports_file_for_del():
 	sel="""
 		select *,tcrr.committee_id committee_ids from tbl_committee_ref_resolution tcrr
 		left join tbl_resolution_file_committee trfc on trfc.committee_id=tcrr.committee_id
-		where tcrr.committee_id='"""+str(p['committee_id'])+"""' and
-		tcrr.resolution_id='"""+str(p['resolution_id'])+"""'
+		where tcrr.committee_id=%s and
+		tcrr.resolution_id=%s
 	"""
-	rd=pyread(sel)
+	sel_params = [str(p['committee_id']), str(p['resolution_id'])]
+	rd=pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 @query.route('/get_committee_petition_reports_file_for_del', methods=['GET', 'POST'])
@@ -3163,10 +3457,11 @@ def get_committee_petition_reports_file_for_del():
 	sel="""
 		select *,tcrp.committee_id committee_ids from tbl_committee_ref_petition tcrp
 		left join tbl_petition_path_committee tppc on tppc.committee_id=tcrp.committee_id
-		where  tcrp.committee_id='"""+str(p['committee_id'])+"""' and
-		tcrp.petition_id='"""+str(p['petition_id'])+"""'
+		where  tcrp.committee_id=%s and
+		tcrp.petition_id=%s
 	"""
-	rd=pyread(sel)
+	sel_params = [str(p['committee_id']), str(p['petition_id'])]
+	rd=pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 
@@ -3177,10 +3472,11 @@ def get_committee_petition_reports_file():
 	sel="""
 		select *,tcrp.committee_id committee_ids from tbl_committee_ref_petition tcrp
 		left join tbl_petition_path_committee tppc on tppc.committee_id=tcrp.committee_id
-		where committee_ref_petition_id='"""+str(p['committee_ref_petition_id'])+"""' 
-		and tcrp.date_reffered='"""+str(p['date_reffered'])+"""'
+		where committee_ref_petition_id=%s 
+		and tcrp.date_reffered=%s
 	"""
-	rd=pyread(sel)
+	sel_params = [str(p['committee_ref_petition_id']), str(p['date_reffered'])]
+	rd=pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 
@@ -3190,12 +3486,14 @@ def save_committee_resolution():
 	p=request.form
 	if p['resolution_id']==0 or p['resolution_id']=="0":
 		insert="""
-			insert into tbl_committee_resolution set resolution_id='"""+str(p['resolution_id_main'])+"""',committee_id='"""+str(p['committee_id'])+"""'
+			insert into tbl_committee_resolution set resolution_id=%s,committee_id=%s
 		"""
-		rd=cud_callbackid(insert)
+		insert_params = [str(p['resolution_id_main']), str(p['committee_id'])]
+		rd=cud_callbackid_safe(insert, insert_params)
 
-		update_resolution="update tbl_resolution set status='"+str(p['status'])+"' where resolution_id='"+str(p['resolution_id_main'])+"'"
-		cud(update_resolution)
+		update_resolution="""update tbl_resolution set status=%s where resolution_id=%s"""
+		update_resolution_params = [str(p['status']), str(p['resolution_id_main'])]
+		cud_safe(update_resolution, update_resolution_params)
 
 		x=-1
 		y=-1
@@ -3226,16 +3524,18 @@ def save_committee_resolution():
 					path_location=location.replace("/", "\\\\");
 					
 					insert2="""
-						insert into tbl_resolution_file_committee set filename='"""+str(file.filename.replace("'",""))+"""',
-						path='"""+str(path_location)+"""', resolution_id='"""+str(p['resolution_id_main'])+"""',
-						committee_id='"""+str(p['committee_id'])+"""'
+						insert into tbl_resolution_file_committee set filename=%s,
+						path=%s, resolution_id=%s,
+						committee_id=%s
 					"""
-					cud(insert2)
+					insert2_params = [str(file.filename.replace("'","")), str(path_location), str(p['resolution_id_main']), str(p['committee_id'])]
+					cud_safe(insert2, insert2_params)
 
 			if str(split[0])=="file_minutes":
 
-				select="select minutes_id from tbl_resolution where resolution_id='"+str(p['resolution_id_main'])+"'"
-				rd=pyread(select)
+				select="""select minutes_id from tbl_resolution where resolution_id=%s"""
+				select_params = [str(p['resolution_id_main'])]
+				rd=pyread_safe(select, select_params)
 				if rd:
 					y=y+1
 					file_name="file_minutes["+str(y)+"]"
@@ -3260,19 +3560,21 @@ def save_committee_resolution():
 						path_location=location.replace("/", "\\\\");
 						
 						insert2="""
-							insert into tbl_minutes_path_committee_resolution  set filename='"""+str(file.filename.replace("'",""))+"""',
-							path='"""+str(path_location)+"""', minutes_id='"""+str(rd[0]['minutes_id'])+"""',
-							committee_id='"""+str(p['committee_id'])+"""', resolution_id='"""+str(p['resolution_id_main'])+"""'
+							insert into tbl_minutes_path_committee_resolution  set filename=%s,
+							path=%s, minutes_id=%s,
+							committee_id=%s, resolution_id=%s
 						"""
-						cud(insert2)
+						insert2_params = [str(file.filename.replace("'","")), str(path_location), str(rd[0]['minutes_id']), str(p['committee_id']), str(p['resolution_id_main'])]
+						cud_safe(insert2, insert2_params)
 
 		sel="""
 			select * from tbl_resolution
-			where resolution_id='"""+str(p['resolution_id_main'])+"""'
+			where resolution_id=%s
 		"""
-		rd_resolution_title=pyread(sel)
+		sel_params = [str(p['resolution_id_main'])]
+		rd_resolution_title=pyread_safe(sel, sel_params)
 
-		title_track=rd_resolution_title[0]['resolution_title'].replace("'","''")
+		title_track=rd_resolution_title[0]['resolution_title']
 		if rd_resolution_title[0]['resolution_title']!="":
 			doc_status = ""
 			# insert_track="""
@@ -3283,8 +3585,9 @@ def save_committee_resolution():
 			# cud(insert_track)
 		return jsonify("Succesfully Saved")
 	else:
-		update_resolution="update tbl_resolution set status='"+str(p['status'])+"' where resolution_id='"+str(p['resolution_id_main'])+"'"
-		cud(update_resolution)
+		update_resolution="""update tbl_resolution set status=%s where resolution_id=%s"""
+		update_resolution_params = [str(p['status']), str(p['resolution_id_main'])]
+		cud_safe(update_resolution, update_resolution_params)
 
 		x=-1
 		y=-1
@@ -3315,16 +3618,18 @@ def save_committee_resolution():
 					path_location=location.replace("/", "\\\\");
 					
 					insert2="""
-						insert into tbl_resolution_file_committee set filename='"""+str(file.filename.replace("'",""))+"""',
-						path='"""+str(path_location)+"""', resolution_id='"""+str(p['resolution_id_main'])+"""',
-						committee_id='"""+str(p['committee_id'])+"""'
+						insert into tbl_resolution_file_committee set filename=%s,
+						path=%s, resolution_id=%s,
+						committee_id=%s
 					"""
-					cud(insert2)
+					insert2_params = [str(file.filename.replace("'","")), str(path_location), str(p['resolution_id_main']), str(p['committee_id'])]
+					cud_safe(insert2, insert2_params)
 
 			if str(split[0])=="file_minutes":
 
-				select="select minutes_id from tbl_resolution where resolution_id='"+str(p['resolution_id_main'])+"'"
-				rd=pyread(select)
+				select="""select minutes_id from tbl_resolution where resolution_id=%s"""
+				select_params = [str(p['resolution_id_main'])]
+				rd=pyread_safe(select, select_params)
 				if rd:
 					y=y+1
 					file_name="file_minutes["+str(y)+"]"
@@ -3349,18 +3654,20 @@ def save_committee_resolution():
 						path_location=location.replace("/", "\\\\");
 						
 						insert2="""
-							insert into tbl_minutes_path_committee_resolution  set filename='"""+str(file.filename.replace("'",""))+"""',
-							path='"""+str(path_location)+"""', minutes_id='"""+str(rd[0]['minutes_id'])+"""',
-							committee_id='"""+str(p['committee_id'])+"""', resolution_id='"""+str(p['resolution_id_main'])+"""'
+							insert into tbl_minutes_path_committee_resolution  set filename=%s,
+							path=%s, minutes_id=%s,
+							committee_id=%s, resolution_id=%s
 						"""
-						cud(insert2)
+						insert2_params = [str(file.filename.replace("'","")), str(path_location), str(rd[0]['minutes_id']), str(p['committee_id']), str(p['resolution_id_main'])]
+						cud_safe(insert2, insert2_params)
 
 		sel="""
 			select * from tbl_resolution
-			where resolution_id='"""+str(p['resolution_id_main'])+"""'
+			where resolution_id=%s
 		"""
-		rd_resolution_title=pyread(sel)
-		title_track=rd_resolution_title[0]['resolution_title'].replace("'","''")
+		sel_params = [str(p['resolution_id_main'])]
+		rd_resolution_title=pyread_safe(sel, sel_params)
+		title_track=rd_resolution_title[0]['resolution_title']
 		if rd_resolution_title[0]['resolution_title']!="":
 			doc_status = ""
 
@@ -3376,8 +3683,9 @@ def save_committee_resolution():
 @login_required
 def get_tbl_committee_ref_ordinance():
 	p=json.loads(request.data)
-	sel="select * from tbl_committee_ref_ordinance where ordinance_id='"+str(p['ordinance_id'])+"'"
-	rd=pyread(sel)
+	sel="""select * from tbl_committee_ref_ordinance where ordinance_id=%s"""
+	sel_params = [str(p['ordinance_id'])]
+	rd=pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 
@@ -3387,12 +3695,14 @@ def save_committee_ordinance():
 	p=request.form
 	if p['ordinance_id']==0 or p['ordinance_id']=="0":
 		insert="""insert into tbl_committee_ordinance set  
-		ordinance_id='"""+str(p['ordinance_id_main'])+"""', committee_id='"""+str(p['committee_id'])+"""'
+		ordinance_id=%s, committee_id=%s
 		"""
-		cud(insert)
+		insert_params = [str(p['ordinance_id_main']), str(p['committee_id'])]
+		cud_safe(insert, insert_params)
 
-		update_ordinance="update tbl_ordinance set status='"+str(p['status'])+"' where ordinance_id='"+str(p['ordinance_id_main'])+"'"
-		cud(update_ordinance)
+		update_ordinance="""update tbl_ordinance set status=%s where ordinance_id=%s"""
+		update_ordinance_params = [str(p['status']), str(p['ordinance_id_main'])]
+		cud_safe(update_ordinance, update_ordinance_params)
 
 		x=-1
 		y=-1
@@ -3423,15 +3733,17 @@ def save_committee_ordinance():
 					path_location=location.replace("/", "\\\\");
 					
 					insert2="""insert into tbl_ordinance_file_committee set 
-						filename='"""+str(file.filename.replace("'",""))+"""', path='"""+str(path_location)+"""', 
-						ordinance_id='"""+str(p['ordinance_id_main'])+"""', committee_id='"""+str(p['committee_id'])+"""'
+						filename=%s, path=%s, 
+						ordinance_id=%s, committee_id=%s
 					"""
-					cud(insert2)
+					insert2_params = [str(file.filename.replace("'","")), str(path_location), str(p['ordinance_id_main']), str(p['committee_id'])]
+					cud_safe(insert2, insert2_params)
 
 			if str(split[0])=="file_minutes":
 
-				select="select minutes_id from tbl_ordinance where ordinance_id='"+str(p['ordinance_id_main'])+"'"
-				rd=pyread(select)
+				select="""select minutes_id from tbl_ordinance where ordinance_id=%s"""
+				select_params = [str(p['ordinance_id_main'])]
+				rd=pyread_safe(select, select_params)
 				if rd:
 					y=y+1
 					file_name="file_minutes["+str(y)+"]"
@@ -3457,17 +3769,19 @@ def save_committee_ordinance():
 						path_location=location.replace("/", "\\\\");
 						
 						insert2="""insert into tbl_minutes_path_committee_ordinance  set 
-							filename='"""+str(file.filename.replace("'",""))+"""', path='"""+str(path_location)+"""', 
-							minutes_id='"""+str(rd[0]['minutes_id'])+"""', committee_id='"""+str(p['committee_id'])+"""',
-							ordinance_id='"""+str(p['ordinance_id_main'])+"""'
+							filename=%s, path=%s, 
+							minutes_id=%s, committee_id=%s,
+							ordinance_id=%s
 						"""
-						cud(insert2)
+						insert2_params = [str(file.filename.replace("'","")), str(path_location), str(rd[0]['minutes_id']), str(p['committee_id']), str(p['ordinance_id_main'])]
+						cud_safe(insert2, insert2_params)
 		sel="""
 			select * from tbl_ordinance
-			where ordinance_id='"""+str(p['ordinance_id_main'])+"""'
+			where ordinance_id=%s
 		"""
-		rd_ordinance_title=pyread(sel)
-		title_track=rd_ordinance_title[0]['ordinance_title'].replace("'","''")
+		sel_params = [str(p['ordinance_id_main'])]
+		rd_ordinance_title=pyread_safe(sel, sel_params)
+		title_track=rd_ordinance_title[0]['ordinance_title']
 		# if rd_ordinance_title[0]['ordinance_title']!="":
 		# 	insert_track="""
 		# 		insert into tbl_document_tracking set document_id='"""+str(p['ordinance_id_main'])+"""',
@@ -3477,8 +3791,9 @@ def save_committee_ordinance():
 		return jsonify("Succesfuly Saved")
 	else:
 
-		update_ordinance="update tbl_ordinance set status='"+str(p['status'])+"' where ordinance_id='"+str(p['ordinance_id_main'])+"'"
-		cud(update_ordinance)
+		update_ordinance="""update tbl_ordinance set status=%s where ordinance_id=%s"""
+		update_ordinance_params = [str(p['status']), str(p['ordinance_id_main'])]
+		cud_safe(update_ordinance, update_ordinance_params)
 
 		x=-1
 		y=-1
@@ -3508,16 +3823,18 @@ def save_committee_ordinance():
 					path_location=location.replace("/", "\\\\");
 					
 					insert2="""
-						insert into tbl_ordinance_file_committee set filename='"""+str(file.filename.replace("'",""))+"""', 
-						path='"""+str(path_location)+"""', ordinance_id='"""+str(p['ordinance_id_main'])+"""', 
-						committee_id='"""+str(p['committee_id'])+"""'
+						insert into tbl_ordinance_file_committee set filename=%s, 
+						path=%s, ordinance_id=%s, 
+						committee_id=%s
 					"""
-					cud(insert2)
+					insert2_params = [str(file.filename.replace("'","")), str(path_location), str(p['ordinance_id_main']), str(p['committee_id'])]
+					cud_safe(insert2, insert2_params)
 
 			if str(split[0])=="file_minutes":
 
-				select="select minutes_id from tbl_ordinance where ordinance_id='"+str(p['ordinance_id_main'])+"'"
-				rd=pyread(select)
+				select="""select minutes_id from tbl_ordinance where ordinance_id=%s"""
+				select_params = [str(p['ordinance_id_main'])]
+				rd=pyread_safe(select, select_params)
 				if rd:
 					y=y+1
 					file_name="file_minutes["+str(y)+"]"
@@ -3543,17 +3860,19 @@ def save_committee_ordinance():
 						path_location=location.replace("/", "\\\\");
 						
 						insert2="""
-							insert into tbl_minutes_path_committee_ordinance set filename='"""+str(file.filename.replace("'",""))+"""',
-							path='"""+str(path_location)+"""', minutes_id='"""+str(rd[0]['minutes_id'])+"""',
-							committee_id='"""+str(p['committee_id'])+"""',ordinance_id='"""+str(p['ordinance_id_main'])+"""'
+							insert into tbl_minutes_path_committee_ordinance set filename=%s,
+							path=%s, minutes_id=%s,
+							committee_id=%s,ordinance_id=%s
 						"""
-						cud(insert2)
+						insert2_params = [str(file.filename.replace("'","")), str(path_location), str(rd[0]['minutes_id']), str(p['committee_id']), str(p['ordinance_id_main'])]
+						cud_safe(insert2, insert2_params)
 		sel="""
 			select * from tbl_ordinance
-			where ordinance_id='"""+str(p['ordinance_id_main'])+"""'
+			where ordinance_id=%s
 		"""
-		rd_ordinance_title=pyread(sel)
-		title_track=rd_ordinance_title[0]['ordinance_title'].replace("'","''")
+		sel_params = [str(p['ordinance_id_main'])]
+		rd_ordinance_title=pyread_safe(sel, sel_params)
+		title_track=rd_ordinance_title[0]['ordinance_title']
 		# if rd_ordinance_title[0]['ordinance_title']!="":
 		# 	insert_track="""
 		# 		insert into tbl_document_tracking set document_id='"""+str(p['ordinance_id_main'])+"""',
@@ -3568,10 +3887,11 @@ def save_committee_petition():
 	p=request.form
 	if p['petition_id']==0 or p['petition_id']=="0":
 		insert="""
-			insert into tbl_committee_petition set action_taken='"""+str(p['action_taken'])+"""',
-			 petition_id='"""+str(p['petition_id_main'])+"""', committee_id='"""+str(p['committee_id'])+"""'
+			insert into tbl_committee_petition set action_taken=%s,
+			 petition_id=%s, committee_id=%s
 		"""
-		cud(insert)
+		insert_params = [str(p['action_taken']), str(p['petition_id_main']), str(p['committee_id'])]
+		cud_safe(insert, insert_params)
 		x=-1
 		y=-1
 		for filename_array in request.files:
@@ -3601,11 +3921,12 @@ def save_committee_petition():
 					path_location=location.replace("/", "\\\\");
 					
 					insert2="""
-						insert into tbl_petition_path_committee set filename='"""+str(file.filename.replace("'",""))+"""',
-						path='"""+str(path_location)+"""',petition_id='"""+str(p['petition_id_main'])+"""',
-						committee_id='"""+str(p['committee_id'])+"""'
+						insert into tbl_petition_path_committee set filename=%s,
+						path=%s,petition_id=%s,
+						committee_id=%s
 					"""
-					cud(insert2)
+					insert2_params = [str(file.filename.replace("'","")), str(path_location), str(p['petition_id_main']), str(p['committee_id'])]
+					cud_safe(insert2, insert2_params)
 
 			if str(split[0])=="file_minutes":
 				y=y+1
@@ -3632,18 +3953,20 @@ def save_committee_petition():
 					path_location=location.replace("/", "\\\\");
 					
 					insert2="""
-						insert into tbl_minutes_path_committee_petition set filename='"""+str(file.filename.replace("'",""))+"""',
-						path='"""+str(path_location)+"""', petition_id='"""+str(p['petition_id_main'])+"""',
-						committee_id='"""+str(p['committee_id'])+"""'
+						insert into tbl_minutes_path_committee_petition set filename=%s,
+						path=%s, petition_id=%s,
+						committee_id=%s
 					"""
-					cud(insert2)
+					insert2_params = [str(file.filename.replace("'","")), str(path_location), str(p['petition_id_main']), str(p['committee_id'])]
+					cud_safe(insert2, insert2_params)
 
 
 		sel="""
 			select * from tbl_petition
-			where petition_id='"""+str(p['petition_id_main'])+"""'
+			where petition_id=%s
 		"""
-		rd_petition_title=pyread(sel)
+		sel_params = [str(p['petition_id_main'])]
+		rd_petition_title=pyread_safe(sel, sel_params)
 		# if rd_petition_title[0]['petition_id']!="":
 		# 	insert_track="""
 		# 		insert into tbl_document_tracking set document_id='"""+str(p['petition_id_main'])+"""',
@@ -3655,10 +3978,11 @@ def save_committee_petition():
 		return jsonify("Succesfuly Saved")
 	else:
 		update="""
-			update tbl_committee_petition set action_taken='"""+str(p['action_taken'])+"""' 
-			where petition_id='"""+str(p['petition_id_main'])+"""' and committee_id='"""+str(p['committee_id'])+"""'
+			update tbl_committee_petition set action_taken=%s 
+			where petition_id=%s and committee_id=%s
 		"""
-		cud(update)
+		update_params = [str(p['action_taken']), str(p['petition_id_main']), str(p['committee_id'])]
+		cud_safe(update, update_params)
 
 		x=-1
 		y=-1
@@ -3688,11 +4012,12 @@ def save_committee_petition():
 					path_location=location.replace("/", "\\\\");
 					
 					insert2="""
-						insert into tbl_petition_path_committee set filename='"""+str(file.filename.replace("'",""))+"""',
-						path='"""+str(path_location)+"""', petition_id='"""+str(p['petition_id_main'])+"""',
-						committee_id='"""+str(p['committee_id'])+"""'
+						insert into tbl_petition_path_committee set filename=%s,
+						path=%s, petition_id=%s,
+						committee_id=%s
 					"""
-					cud(insert2)
+					insert2_params = [str(file.filename.replace("'","")), str(path_location), str(p['petition_id_main']), str(p['committee_id'])]
+					cud_safe(insert2, insert2_params)
 
 			if str(split[0])=="file_minutes":
 				y=y+1
@@ -3718,18 +4043,20 @@ def save_committee_petition():
 					path_location=location.replace("/", "\\\\");
 					
 					insert2="""
-						insert into tbl_minutes_path_committee_petition set filename='"""+str(file.filename.replace("'",""))+"""',
-						path='"""+str(path_location)+"""', petition_id='"""+str(p['petition_id_main'])+"""'
+						insert into tbl_minutes_path_committee_petition set filename=%s,
+						path=%s, petition_id=%s
 					"""
-					cud(insert2)
+					insert2_params = [str(file.filename.replace("'","")), str(path_location), str(p['petition_id_main'])]
+					cud_safe(insert2, insert2_params)
 
 		sel="""
 			select * from tbl_petition
-			where petition_id='"""+str(p['petition_id_main'])+"""'
+			where petition_id=%s
 		"""
-		rd_petition_title=pyread(sel)
+		sel_params = [str(p['petition_id_main'])]
+		rd_petition_title=pyread_safe(sel, sel_params)
 
-		title_track=rd_petition_title[0]['title'].replace("'","''")
+		title_track=rd_petition_title[0]['title']
 		# if rd_petition_title[0]['petition_id']!="":
 		# 	insert_track="""
 		# 		insert into tbl_document_tracking set document_id='"""+str(p['petition_id_main'])+"""',
@@ -3748,10 +4075,11 @@ def get_committee_resolution_file():
 	sel="""
 		select * from tbl_committee_ref_resolution tcrr
 		left join tbl_resolution_file_committee trfc on trfc.committee_id=tcrr.committee_id
-		where trfc.committee_id='"""+str(p['committee_id'])+"""' 
-		and tcrr.resolution_id='"""+str(p['resolution_id'])+"""'
+		where trfc.committee_id=%s 
+		and tcrr.resolution_id=%s
 	"""
-	rd=pyread(sel)
+	sel_params = [str(p['committee_id']), str(p['resolution_id'])]
+	rd=pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 
@@ -3761,9 +4089,10 @@ def sel_petition_id_tbl_minutes_path_committee_petition():
 	p=json.loads(request.data)
 	sel="""
 		select * from tbl_minutes_path_committee_petition
-		where petition_id='"""+str(p['petition_id'])+"""' and committee_id='"""+str(p['committee_id'])+"""'
+		where petition_id=%s and committee_id=%s
 	"""
-	rd=pyread(sel)
+	sel_params = [str(p['petition_id']), str(p['committee_id'])]
+	rd=pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 
@@ -3775,10 +4104,11 @@ def get_committee_ordinance_status():
 		select *,tco.ordinance_id tco_ordinance_id 
 		from tbl_committee_ordinance tco
 		left join tbl_ordinance tbo on tbo.ordinance_id=tco.ordinance_id
-		where tbo.ordinance_id='"""+str(p['ordinance_id'])+"""' 
-		and tco.committee_id='"""+str(p['committee_id'])+"""'
+		where tbo.ordinance_id=%s 
+		and tco.committee_id=%s
 	"""
-	rd=pyread(sel)
+	sel_params = [str(p['ordinance_id']), str(p['committee_id'])]
+	rd=pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 
@@ -3790,10 +4120,11 @@ def get_committee_resolution_status():
 		select *,tcr.resolution_id tcr_resolution_id 
 		from tbl_committee_resolution tcr
 		left join tbl_resolution tr on tr.resolution_id=tcr.resolution_id
-		where tr.resolution_id='"""+str(p['resolution_id'])+"""' 
-		and tcr.committee_id='"""+str(p['committee_id'])+"""'
+		where tr.resolution_id=%s 
+		and tcr.committee_id=%s
 	"""
-	rd=pyread(sel)
+	sel_params = [str(p['resolution_id']), str(p['committee_id'])]
+	rd=pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 
@@ -3804,9 +4135,10 @@ def get_committee_resolution_minutes():
 	sel="""
 		select * from tbl_minutes_path_committee_resolution tpcr
 		left join tbl_resolution tr on tr.minutes_id=tpcr.minutes_id
-		where tpcr.committee_id='"""+str(p['committee_id'])+"""' and tpcr.resolution_id='"""+str(p['resolution_id'])+"""'
+		where tpcr.committee_id=%s and tpcr.resolution_id=%s
 	"""
-	rd=pyread(sel)
+	sel_params = [str(p['committee_id']), str(p['resolution_id'])]
+	rd=pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 
@@ -3814,8 +4146,9 @@ def get_committee_resolution_minutes():
 @login_required
 def del_budget_councilor_deduction():
 	p=json.loads(request.data)
-	delete="delete from tbl_sp_budget_balance_expenses where balance_expenses_id='"+str(p['balance_expenses_id'])+"'"
-	cud(delete)
+	delete="""delete from tbl_sp_budget_balance_expenses where balance_expenses_id=%s"""
+	delete_params = [str(p['balance_expenses_id'])]
+	cud_safe(delete, delete_params)
 	return jsonify("Succesfuly Deleted")
 
 
@@ -3825,9 +4158,10 @@ def get_petition_action_taken():
 	p=json.loads(request.data)
 	sel="""
 		select * from tbl_committee_petition tcp
-		where petition_id='"""+str(p['petition_id'])+"""'
+		where petition_id=%s
 	"""
-	rd=pyread(sel)
+	sel_params = [str(p['petition_id'])]
+	rd=pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 @query.route('/get_committee_petition_file', methods=['GET', 'POST'])
@@ -3838,11 +4172,12 @@ def get_committee_petition_file():
 		select * from tbl_petition tp
 		left join tbl_committee_ref_petition tcrp on tcrp.petition_id=tp.petition_id
 		inner join tbl_petition_path_committee tppc on tppc.petition_id=tcrp.petition_id
-		where tcrp.committee_id='"""+str(p['committee_id'])+"""' 
-		and tp.petition_id='"""+str(p['petition_id'])+"""'
+		where tcrp.committee_id=%s 
+		and tp.petition_id=%s
 		GROUP BY tp.petition_id,tcrp.committee_id
 	"""
-	rd=pyread(sel)
+	sel_params = [str(p['committee_id']), str(p['petition_id'])]
+	rd=pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 
@@ -3857,9 +4192,10 @@ def get_resolution_file():
 		left join tbl_committee_ref_resolution tcrf on tcrf.resolution_id=tr.resolution_id
 		left join tbl_committee tc on tc.committee_id=tcrf.committee_id
 		left join tbl_sp ts on ts.sp_id=tr.sp_id 
-		where tr.resolution_id='"""+str(p['resolution_id'])+"""'
+		where tr.resolution_id=%s
 	"""
-	rd=pyread(sel)
+	sel_params = [str(p['resolution_id'])]
+	rd=pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 @query.route('/get_documents_refferals', methods=['GET', 'POST'])
@@ -3965,13 +4301,14 @@ def get_memorandom():
 @login_required
 def save_documents_refferals():
 	p=request.form
-	title=p['title'].replace("'","''")
+	title=p['title']
 	if p['document_referal_id']==0 or p['document_referal_id']=="0":
 		insert="""
-			insert into tbl_documents_refferals set title='"""+str(title)+"""', date_submitted=curdate(), 
-			sp_id='"""+str(p['sp_id'])+"""', type='"""+str(p['type'])+"""'
+			insert into tbl_documents_refferals set title=%s, date_submitted=curdate(), 
+			sp_id=%s, type=%s
 		"""
-		rd=cud_callbackid(insert)
+		insert_params = [str(title), str(p['sp_id']), str(p['type'])]
+		rd=cud_callbackid_safe(insert, insert_params)
 		for filename_array in request.files:
 			file=request.files[filename_array]
 
@@ -3993,15 +4330,17 @@ def save_documents_refferals():
 				location=location1+"/"+filename
 				path_location=location.replace("/", "\\\\");
 				
-				insert2="insert into tbl_documents_refferals_path set filename='"+str(file.filename.replace("'","''"))+"', path='"+str(path_location.replace("'","''"))+"', documents_refferals_id='"+str(rd)+"'"
-				cud(insert2)
+				insert2="""insert into tbl_documents_refferals_path set filename=%s, path=%s, documents_refferals_id=%s"""
+				insert2_params = [str(file.filename), str(path_location), str(rd)]
+				cud_safe(insert2, insert2_params)
 		return jsonify("Succesfuly Saved")
 	else:
 		update="""
-			update tbl_documents_refferals set title='"""+str(title)+"""', sp_id='"""+str(p['sp_id'])+"""', type='"""+str(p['type'])+"""' 
-			where documents_refferals_id='"""+str(p['document_referal_id'])+"""'
+			update tbl_documents_refferals set title=%s, sp_id=%s, type=%s 
+			where documents_refferals_id=%s
 		"""
-		cud(update)
+		update_params = [str(title), str(p['sp_id']), str(p['type']), str(p['document_referal_id'])]
+		cud_safe(update, update_params)
 
 		for filename_array in request.files:
 			file=request.files[filename_array]
@@ -4023,8 +4362,9 @@ def save_documents_refferals():
 				location1.replace("//", "\\\\");
 				location=location1+"/"+filename
 				path_location=location.replace("/", "\\\\");
-				insert2="insert into tbl_documents_refferals_path set filename='"+str(file.filename.replace("'","''"))+"', path='"+str(path_location.replace("'","''"))+"', documents_refferals_id='"+str(p['document_referal_id'])+"'"
-				cud(insert2)
+				insert2="""insert into tbl_documents_refferals_path set filename=%s, path=%s, documents_refferals_id=%s"""
+				insert2_params = [str(file.filename), str(path_location), str(p['document_referal_id'])]
+				cud_safe(insert2, insert2_params)
 		return jsonify("Succesfuly updated")
 
 # 
@@ -4033,11 +4373,12 @@ def save_documents_refferals():
 @login_required
 def save_barangay_ordinance():
 	p=request.form
-	title=p['title'].replace("'","''")
-	description = p['description'].replace("'","''")
+	title=p['title']
+	description = p['description']
 	if p['barangay_ordinance_id']==0 or p['barangay_ordinance_id']=="0":
-		insert="insert into tbl_barangay_ordinance set title='"+str(title)+"', date_submitted=curdate(), description='"+str(description)+"', brgy_id='"+str(p['brgy_id'])+"'"
-		rd=cud_callbackid(insert)
+		insert="""insert into tbl_barangay_ordinance set title=%s, date_submitted=curdate(), description=%s, brgy_id=%s"""
+		insert_params = [str(title), str(description), str(p['brgy_id'])]
+		rd=cud_callbackid_safe(insert, insert_params)
 		for filename_array in request.files:
 			file=request.files[filename_array]
 
@@ -4059,12 +4400,14 @@ def save_barangay_ordinance():
 				location=location1+"/"+filename
 				path_location=location.replace("/", "\\\\");
 				
-				insert2="insert into tbl_barangay_ordinance_path set filename='"+str(file.filename.replace("'",""))+"', path='"+str(path_location)+"', barangay_ordinance_id='"+str(rd)+"'"
-				cud(insert2)
+				insert2="""insert into tbl_barangay_ordinance_path set filename=%s, path=%s, barangay_ordinance_id=%s"""
+				insert2_params = [str(file.filename.replace("'","")), str(path_location), str(rd)]
+				cud_safe(insert2, insert2_params)
 		return jsonify("Succesfuly Saved")
 	else:
-		update="update tbl_barangay_ordinance set title='"+str(title)+"',  description='"+str(description)+"', brgy_id='"+str(p['brgy_id'])+"' where barangay_ordinance_id='"+str(p['barangay_ordinance_id'])+"'"
-		cud(update)
+		update="""update tbl_barangay_ordinance set title=%s,  description=%s, brgy_id=%s where barangay_ordinance_id=%s"""
+		update_params = [str(title), str(description), str(p['brgy_id']), str(p['barangay_ordinance_id'])]
+		cud_safe(update, update_params)
 		for filename_array in request.files:
 			file=request.files[filename_array]
 
@@ -4086,8 +4429,9 @@ def save_barangay_ordinance():
 				location=location1+"/"+filename
 				path_location=location.replace("/", "\\\\");
 				
-				insert2="insert into tbl_barangay_ordinance_path set filename='"+str(file.filename.replace("'",""))+"', path='"+str(path_location)+"', barangay_ordinance_id='"+str(p['barangay_ordinance_id'])+"'"
-				cud(insert2)
+				insert2="""insert into tbl_barangay_ordinance_path set filename=%s, path=%s, barangay_ordinance_id=%s"""
+				insert2_params = [str(file.filename.replace("'","")), str(path_location), str(p['barangay_ordinance_id'])]
+				cud_safe(insert2, insert2_params)
 		return jsonify("Succesfuly updated")
 
 # save barangay resolution
@@ -4096,11 +4440,12 @@ def save_barangay_ordinance():
 @login_required
 def save_barangay_resolution():
 	p=request.form
-	title=p['title'].replace("'","''")
-	description =p['description'].replace("'","''")
+	title=p['title']
+	description =p['description']
 	if p['barangay_resolution_id']==0 or p['barangay_resolution_id']=="0":
-		insert="insert into tbl_barangay_resolution set title='"+str(title)+"', date_submitted=curdate(), description='"+str(description)+"', brgy_id='"+str(p['brgy_id'])+"'"
-		rd=cud_callbackid(insert)
+		insert="""insert into tbl_barangay_resolution set title=%s, date_submitted=curdate(), description=%s, brgy_id=%s"""
+		insert_params = [str(title), str(description), str(p['brgy_id'])]
+		rd=cud_callbackid_safe(insert, insert_params)
 		for filename_array in request.files:
 			file=request.files[filename_array]
 
@@ -4122,12 +4467,14 @@ def save_barangay_resolution():
 				location=location1+"/"+filename
 				path_location=location.replace("/", "\\\\");
 				
-				insert2="insert into tbl_barangay_resolution_path set filename='"+str(file.filename.replace("'",""))+"', path='"+str(path_location)+"', barangay_resolution_id='"+str(rd)+"'"
-				cud(insert2)
+				insert2="""insert into tbl_barangay_resolution_path set filename=%s, path=%s, barangay_resolution_id=%s"""
+				insert2_params = [str(file.filename.replace("'","")), str(path_location), str(rd)]
+				cud_safe(insert2, insert2_params)
 		return jsonify("Succesfuly Saved")
 	else:
-		update="update tbl_barangay_resolution set title='"+str(title)+"',  description='"+str(description)+"', brgy_id='"+str(p['brgy_id'])+"' where barangay_resolution_id='"+str(p['barangay_resolution_id'])+"'"
-		cud(update)
+		update="""update tbl_barangay_resolution set title=%s,  description=%s, brgy_id=%s where barangay_resolution_id=%s"""
+		update_params = [str(title), str(description), str(p['brgy_id']), str(p['barangay_resolution_id'])]
+		cud_safe(update, update_params)
 		for filename_array in request.files:
 			file=request.files[filename_array]
 
@@ -4149,8 +4496,9 @@ def save_barangay_resolution():
 				location=location1+"/"+filename
 				path_location=location.replace("/", "\\\\");
 				
-				insert2="insert into tbl_barangay_resolution_path set filename='"+str(file.filename.replace("'",""))+"', path='"+str(path_location)+"', barangay_resolution_id='"+str(p['barangay_resolution_id'])+"'"
-				cud(insert2)
+				insert2="""insert into tbl_barangay_resolution_path set filename=%s, path=%s, barangay_resolution_id=%s"""
+				insert2_params = [str(file.filename.replace("'","")), str(path_location), str(p['barangay_resolution_id'])]
+				cud_safe(insert2, insert2_params)
 		return jsonify("Succesfuly updated")
 
 # end barangay resolution
@@ -4159,11 +4507,12 @@ def save_barangay_resolution():
 @login_required
 def save_executive_order():
 	p=request.form
-	title=p['title'].replace("'","''")
+	title=p['title']
 
 	if p['executive_order_id']==0 or p['executive_order_id']=="0":
-		insert="insert into tbl_executive_order set title='"+str(title)+"', date_submitted=curdate(), sp_id='"+str(p['sp_id'])+"'"
-		rd=cud_callbackid(insert)
+		insert="""insert into tbl_executive_order set title=%s, date_submitted=curdate(), sp_id=%s"""
+		insert_params = [str(title), str(p['sp_id'])]
+		rd=cud_callbackid_safe(insert, insert_params)
 		for filename_array in request.files:
 			file=request.files[filename_array]
 
@@ -4185,12 +4534,14 @@ def save_executive_order():
 				location=location1+"/"+filename
 				path_location=location.replace("/", "\\\\");
 				
-				insert2="insert into tbl_executive_order_path set filename='"+str(file.filename.replace("'",""))+"', path='"+str(path_location)+"', executive_order_id='"+str(rd)+"'"
-				cud(insert2)
+				insert2="""insert into tbl_executive_order_path set filename=%s, path=%s, executive_order_id=%s"""
+				insert2_params = [str(file.filename.replace("'","")), str(path_location), str(rd)]
+				cud_safe(insert2, insert2_params)
 		return jsonify("Succesfuly Saved")
 	else:
-		update="update tbl_executive_order set title='"+str(title)+"', sp_id='"+str(p['sp_id'])+"' where executive_order_id='"+str(p['executive_order_id'])+"'"
-		cud(update)
+		update="""update tbl_executive_order set title=%s, sp_id=%s where executive_order_id=%s"""
+		update_params = [str(title), str(p['sp_id']), str(p['executive_order_id'])]
+		cud_safe(update, update_params)
 		for filename_array in request.files:
 			file=request.files[filename_array]
 
@@ -4212,8 +4563,9 @@ def save_executive_order():
 				location=location1+"/"+filename
 				path_location=location.replace("/", "\\\\");
 				
-				insert2="insert into tbl_executive_order_path set filename='"+str(file.filename.replace("'",""))+"', path='"+str(path_location)+"', executive_order_id='"+str(p['executive_order_id'])+"'"
-				cud(insert2)
+				insert2="""insert into tbl_executive_order_path set filename=%s, path=%s, executive_order_id=%s"""
+				insert2_params = [str(file.filename.replace("'","")), str(path_location), str(p['executive_order_id'])]
+				cud_safe(insert2, insert2_params)
 		return jsonify("Succesfuly updated")
 
 
@@ -4221,10 +4573,11 @@ def save_executive_order():
 @login_required
 def save_memorandom():
 	p=request.form
-	title=p['title'].replace("'","''")
+	title=p['title']
 	if p['memorandom_id']==0 or p['memorandom_id']=="0":
-		insert="insert into tbl_memorandom set title='"+str(title)+"', date_submitted=curdate(), sp_id='"+str(p['sp_id'])+"'"
-		rd=cud_callbackid(insert)
+		insert="""insert into tbl_memorandom set title=%s, date_submitted=curdate(), sp_id=%s"""
+		insert_params = [str(title), str(p['sp_id'])]
+		rd=cud_callbackid_safe(insert, insert_params)
 		for filename_array in request.files:
 			file=request.files[filename_array]
 
@@ -4246,12 +4599,14 @@ def save_memorandom():
 				location=location1+"/"+filename
 				path_location=location.replace("/", "\\\\");
 				
-				insert2="insert into tbl_memorandom_path set filename='"+str(file.filename.replace("'",""))+"', path='"+str(path_location)+"', memorandom_id='"+str(rd)+"'"
-				cud(insert2)
+				insert2="""insert into tbl_memorandom_path set filename=%s, path=%s, memorandom_id=%s"""
+				insert2_params = [str(file.filename.replace("'","")), str(path_location), str(rd)]
+				cud_safe(insert2, insert2_params)
 		return jsonify("Succesfuly Saved")
 	else:
-		update="update tbl_memorandom set title='"+str(title)+"', sp_id='"+str(p['sp_id'])+"'  where memorandom_id='"+str(p['memorandom_id'])+"'"
-		cud(update)
+		update="""update tbl_memorandom set title=%s, sp_id=%s  where memorandom_id=%s"""
+		update_params = [str(title), str(p['sp_id']), str(p['memorandom_id'])]
+		cud_safe(update, update_params)
 		for filename_array in request.files:
 			file=request.files[filename_array]
 
@@ -4273,8 +4628,9 @@ def save_memorandom():
 				location=location1+"/"+filename
 				path_location=location.replace("/", "\\\\");
 				
-				insert2="insert into tbl_memorandom_path set filename='"+str(file.filename.replace("'",""))+"', path='"+str(path_location)+"', memorandom_id='"+str(p['memorandom_id'])+"'"
-				cud(insert2)
+				insert2="""insert into tbl_memorandom_path set filename=%s, path=%s, memorandom_id=%s"""
+				insert2_params = [str(file.filename.replace("'","")), str(path_location), str(p['memorandom_id'])]
+				cud_safe(insert2, insert2_params)
 		return jsonify("Succesfuly updated")
 
 
@@ -4330,9 +4686,10 @@ def get_ordinance_urgent():
 def get_resolution_file2():
 	p=json.loads(request.data)
 	sel="""
-		select * from tbl_resolution_file where resolution_id='"""+str(p['resolution_id'])+"""' 
+		select * from tbl_resolution_file where resolution_id=%s 
 	"""
-	rd=pyread(sel)
+	sel_params = [str(p['resolution_id'])]
+	rd=pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 @query.route('/get_ordinance_file', methods=['GET', 'POST'])
@@ -4340,9 +4697,10 @@ def get_resolution_file2():
 def get_ordinance_file():
 	p=json.loads(request.data)
 	sel="""
-		select * from tbl_ordinance_file where ordinance_id='"""+str(p['ordinance_id'])+"""' 
+		select * from tbl_ordinance_file where ordinance_id=%s 
 	"""
-	rd=pyread(sel)
+	sel_params = [str(p['ordinance_id'])]
+	rd=pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 
@@ -4351,9 +4709,10 @@ def get_ordinance_file():
 def get_ordinance_veto_file():
 	p=json.loads(request.data)
 	sel="""
-		select * from tbl_veto_ordinance where ordinance_id='"""+str(p['ordinance_id'])+"""' 
+		select * from tbl_veto_ordinance where ordinance_id=%s 
 	"""
-	rd=pyread(sel)
+	sel_params = [str(p['ordinance_id'])]
+	rd=pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 @query.route('/get_resolution_veto_file', methods=['GET', 'POST'])
@@ -4361,9 +4720,10 @@ def get_ordinance_veto_file():
 def get_resolution_veto_file():
 	p=json.loads(request.data)
 	sel="""
-		select * from tbl_veto_resolution where resolution_id='"""+str(p['resolution_id'])+"""' 
+		select * from tbl_veto_resolution where resolution_id=%s 
 	"""
-	rd=pyread(sel)
+	sel_params = [str(p['resolution_id'])]
+	rd=pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 @query.route('/get_minutes_file_resolution', methods=['GET', 'POST'])
@@ -4372,9 +4732,10 @@ def get_minutes_file_resolution():
 	p=json.loads(request.data)
 	
 	sel="""
-		select * from tbl_minutes_resolution_path tmrp where tmrp.minutes_id='"""+str(p['minutes_id'])+"""' 
+		select * from tbl_minutes_resolution_path tmrp where tmrp.minutes_id=%s 
 	"""
-	rd=pyread(sel)
+	sel_params = [str(p['minutes_id'])]
+	rd=pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 @query.route('/get_minutes_file', methods=['GET', 'POST'])
@@ -4384,9 +4745,10 @@ def get_minutes_file():
 	sel="""
 		select * from tbl_ordinance tbo
 		inner join tbl_minutes_path tmp on tmp.minutes_id=tbo.minutes_id 
-		where tbo.ordinance_id='"""+str(p['ordinance_id'])+"""'  
+		where tbo.ordinance_id=%s  
 	"""
-	rd=pyread(sel)
+	sel_params = [str(p['ordinance_id'])]
+	rd=pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 @query.route('/get_committe_ord_file', methods=['GET', 'POST'])
@@ -4395,17 +4757,19 @@ def get_committe_ord_file():
 	p=json.loads(request.data)
 	sel="""
 		select * from tbl_ordinance_file_committee tofc
-		where tofc.ordinance_id='"""+str(p['ordinance_id'])+"""'  
+		where tofc.ordinance_id=%s  
 	"""
-	rd=pyread(sel)
+	sel_params = [str(p['ordinance_id'])]
+	rd=pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 @query.route('/del_ordinance', methods=['GET', 'POST'])
 @login_required
 def del_ordinance():
 	p=json.loads(request.data)
-	delete="delete from tbl_ordinance where ordinance_id='"+str(p['ordinance_id'])+"'"
-	cud(delete)
+	delete="""delete from tbl_ordinance where ordinance_id=%s"""
+	delete_params = [str(p['ordinance_id'])]
+	cud_safe(delete, delete_params)
 	n_path = Path(__file__).parent / "../static/uploads/upload_ordinance_files" / str(p['ordinance_id'])
 	n_path.resolve()
 	if Path.exists(n_path):
@@ -4417,8 +4781,9 @@ def del_ordinance():
 @login_required
 def del_committee_reports():
 	p=json.loads(request.data)
-	delete="delete from tbl_committee_report where id='"+str(p['ids'])+"'"
-	cud(delete)
+	delete="""delete from tbl_committee_report where id=%s"""
+	delete_params = [str(p['ids'])]
+	cud_safe(delete, delete_params)
 	return jsonify("Succesfuly Deleted")
 
 
@@ -4426,8 +4791,9 @@ def del_committee_reports():
 @login_required
 def del_resolution():
 	p=json.loads(request.data)
-	delete="delete from tbl_resolution where resolution_id='"+str(p['resolution_id'])+"'"
-	cud(delete)
+	delete="""delete from tbl_resolution where resolution_id=%s"""
+	delete_params = [str(p['resolution_id'])]
+	cud_safe(delete, delete_params)
 	n_path = Path(__file__).parent / "../static/uploads/upload_files_resolution" / str(p['resolution_id'])
 	n_path.resolve()
 	if Path.exists(n_path):
@@ -4439,9 +4805,10 @@ def del_resolution():
 @login_required
 def delete_resolution_minutes_file():
 	p=json.loads(request.data)
-	delete="delete from tbl_minutes_resolution_path where minutes_res_id='"+str(p['minutes_res_id'])+"'"
+	delete="""delete from tbl_minutes_resolution_path where minutes_res_id=%s"""
+	delete_params = [str(p['minutes_res_id'])]
 	
-	cud(delete)
+	cud_safe(delete, delete_params)
 	n_path = Path(__file__).parent / "../static/uploads/upload_files_resolution_minutes" / str(p['minutes_id'])
 	n_path.resolve()
 	if Path.exists(n_path):
@@ -4453,8 +4820,9 @@ def delete_resolution_minutes_file():
 @login_required
 def save_resolution_committee():
 	p=json.loads(request.data)
-	insert_committee_resolution="insert tbl_committee_ref_resolution set committee_id='"+str(p['committee_id'])+"', resolution_id='"+str(p['resolution_id'])+"', date_reffered=now()"
-	cud(insert_committee_resolution)
+	insert_committee_resolution="""insert tbl_committee_ref_resolution set committee_id=%s, resolution_id=%s, date_reffered=now()"""
+	insert_committee_resolution_params = [str(p['committee_id']), str(p['resolution_id'])]
+	cud_safe(insert_committee_resolution, insert_committee_resolution_params)
 	return jsonify("Succesfuly Saved")
 
 
@@ -4464,9 +4832,9 @@ def save_resolution():
 	p=request.form
 	p=json.loads(p['Serialized'])
 
-	descr=p['description'].replace("'","''")
-	resolution_title=p['resolution_title'].replace("'","''")
-	minutes_title=p['minutes_title'].replace("'","''")
+	descr=p['description']
+	resolution_title=p['resolution_title']
+	minutes_title=p['minutes_title']
 
 
 	new_lst=(','.join(p['ref_committee'][0]))
@@ -4485,45 +4853,52 @@ def save_resolution():
 		
 	if p['resolution_id']==0 or p['resolution_id']=="0":
 
-		sel_if_exst_res_no="select count(*) count_res_num from tbl_resolution where resolution_number='"+str(p['resolution_no'])+"'"
-		rd_count=pyread(sel_if_exst_res_no)
+		sel_if_exst_res_no="""select count(*) count_res_num from tbl_resolution where resolution_number=%s"""
+		sel_if_exst_res_no_params = [str(p['resolution_no'])]
+		rd_count=pyread_safe(sel_if_exst_res_no, sel_if_exst_res_no_params)
 
 		categories = str(p['categories'][0]).replace("'",'').replace("[","").replace("]","").replace(" ", "")
 
 		if rd_count[0]['count_res_num']==0:
-			insert="""insert into tbl_resolution set resolution_number='"""+str(p['resolution_no'])+"""', 
-				resolution_title='"""+str(resolution_title)+"""', date_enacted='"""+str(p['date_enacted'])+"""',
-				category='"""+str(categories)+"""', sp_id='"""+str(p['sp_id'])+"""', session_id='"""+str(p['session_id'])+"""',
-				tracking_number='"""+str(p['tracking_no'])+"""', classification_id='"""+str(p['gov_classification'])+"""', 
-				source_of_document='"""+str(p['source_of_document'])+"""', source_document_specify='"""+str(p['source_document_specify'])+"""',
-				remarks='"""+str(p['remarks'])+"""', `status`='"""+str(p['status'])+"""',
-				description='"""+str(descr)+"""', series_number='"""+str(p['series_number'])+"""'
+			insert="""insert into tbl_resolution set resolution_number=%s, 
+				resolution_title=%s, date_enacted=%s,
+				category=%s, sp_id=%s, session_id=%s,
+				tracking_number=%s, classification_id=%s, 
+				source_of_document=%s, source_document_specify=%s,
+				remarks=%s, `status`=%s,
+				description=%s, series_number=%s
 			"""
-			rd=cud_callbackid(insert)
+			insert_params = [str(p['resolution_no']), str(resolution_title), str(p['date_enacted']), str(categories), str(p['sp_id']), str(p['session_id']), str(p['tracking_no']), str(p['gov_classification']), str(p['source_of_document']), str(p['source_document_specify']), str(p['remarks']), str(p['status']), str(descr), str(p['series_number'])]
+			rd=cud_callbackid_safe(insert, insert_params)
 
 			for i in p['ref_committee'][0]:
-				insert_committee="insert into tbl_committee_ref_resolution set committee_id='"+str(i)+"', resolution_id='"+str(rd)+"', date_reffered=now()"
-				cud(insert_committee)
+				insert_committee="""insert into tbl_committee_ref_resolution set committee_id=%s, resolution_id=%s, date_reffered=now()"""
+				insert_committee_params = [str(i), str(rd)]
+				cud_safe(insert_committee, insert_committee_params)
 
 			if 'input_authors' in p:
 				for i in p['input_authors']:
-					insert_author="insert into tbl_resolution_author set author='"+str(i)+"', resolution_id='"+str(rd)+"'"
-					cud(insert_author)
+					insert_author="""insert into tbl_resolution_author set author=%s, resolution_id=%s"""
+					insert_author_params = [str(i), str(rd)]
+					cud_safe(insert_author, insert_author_params)
 
 			if 'input_co_authors' in p:
 				for i in p['input_co_authors']:
-					insert_co_author="insert into tbl_resolution_co_author set co_author='"+str(i)+"', resolution_id='"+str(rd)+"'"
-					cud(insert_co_author)
+					insert_co_author="""insert into tbl_resolution_co_author set co_author=%s, resolution_id=%s"""
+					insert_co_author_params = [str(i), str(rd)]
+					cud_safe(insert_co_author, insert_co_author_params)
 
 			if 'input_sponsor' in p:
 				for i in p['input_sponsor']:
-					insert_sponsor="insert into tbl_resolution_sponsor set sponsor='"+str(i)+"', resolution_id='"+str(rd)+"'"
-					cud(insert_sponsor)
+					insert_sponsor="""insert into tbl_resolution_sponsor set sponsor=%s, resolution_id=%s"""
+					insert_sponsor_params = [str(i), str(rd)]
+					cud_safe(insert_sponsor, insert_sponsor_params)
 
 			if 'input_cosponsor' in p:
 				for i in p['input_cosponsor']:
-					insert_cosponsor="insert into tbl_resolution_cosponsor set cosponsor='"+str(i)+"', resolution_id='"+str(rd)+"'"
-					cud(insert_cosponsor)
+					insert_cosponsor="""insert into tbl_resolution_cosponsor set cosponsor=%s, resolution_id=%s"""
+					insert_cosponsor_params = [str(i), str(rd)]
+					cud_safe(insert_cosponsor, insert_cosponsor_params)
 
 			x=-1
 			y=-1
@@ -4540,7 +4915,7 @@ def save_resolution():
 					n_path.resolve()
 					
 					if file and allowed_file(file.filename):
-						filename = str(custom_secure_filename(file.filename)).replace("'","''")
+						filename = str(custom_secure_filename(file.filename))
 						if not Path.exists(n_path):
 							Path.mkdir(n_path)
 							app.config['UPLOAD_FOLDER']=n_path
@@ -4554,8 +4929,9 @@ def save_resolution():
 						location=location1+"/"+filename
 						path_location=location.replace("/", "\\\\");
 						
-						insert2="insert into tbl_resolution_file set filename='"+str(file.filename.replace("'",""))+"', path='"+str(path_location)+"', resolution_id='"+str(rd)+"'"
-						cud(insert2)
+						insert2="""insert into tbl_resolution_file set filename=%s, path=%s, resolution_id=%s"""
+						insert2_params = [str(file.filename.replace("'","")), str(path_location), str(rd)]
+						cud_safe(insert2, insert2_params)
 
 					# file minutes  ---------------------------------->
 
@@ -4568,7 +4944,7 @@ def save_resolution():
 					n_path.resolve()
 					
 					if file and allowed_file(file.filename):
-						filename = str(custom_secure_filename(file.filename)).replace("'","''")
+						filename = str(custom_secure_filename(file.filename))
 						if not Path.exists(n_path):
 							Path.mkdir(n_path)
 							app.config['UPLOAD_FOLDER']=n_path
@@ -4582,8 +4958,9 @@ def save_resolution():
 						location=location1+"/"+filename
 						path_location=location.replace("/", "\\\\");
 
-						insert_tbl_minutes_path="insert into tbl_minutes_resolution_path set filename='"+str(file.filename.replace("'",""))+"', path='"+str(path_location)+"', minutes_id='"+str(rd)+"'"
-						cud(insert_tbl_minutes_path)
+						insert_tbl_minutes_path="""insert into tbl_minutes_resolution_path set filename=%s, path=%s, minutes_id=%s"""
+						insert_tbl_minutes_path_params = [str(file.filename.replace("'","")), str(path_location), str(rd)]
+						cud_safe(insert_tbl_minutes_path, insert_tbl_minutes_path_params)
 
 
 				if str(split[0])=="file_veto":
@@ -4595,7 +4972,7 @@ def save_resolution():
 					n_path.resolve()
 					
 					if file and allowed_file(file.filename):
-						filename = str(custom_secure_filename(file.filename)).replace("'","''")
+						filename = str(custom_secure_filename(file.filename))
 						if not Path.exists(n_path):
 							Path.mkdir(n_path)
 							app.config['UPLOAD_FOLDER']=n_path
@@ -4609,11 +4986,13 @@ def save_resolution():
 						location=location1+"/"+filename
 						path_location=location.replace("/", "\\\\");
 
-						insert_veto="insert into tbl_veto_resolution set filename='"+str(file.filename.replace("'",""))+"', path='"+str(path_location)+"', resolution_id='"+str(rd)+"'"
-						cud(insert_veto)
+						insert_veto="""insert into tbl_veto_resolution set filename=%s, path=%s, resolution_id=%s"""
+						insert_veto_params = [str(file.filename.replace("'","")), str(path_location), str(rd)]
+						cud_safe(insert_veto, insert_veto_params)
 
-			sel_res="select * from tbl_resolution where resolution_id='"+str(rd)+"'"
-			rd_reso=pyread(sel_res)
+			sel_res="""select * from tbl_resolution where resolution_id=%s"""
+			sel_res_params = [str(rd)]
+			rd_reso=pyread_safe(sel_res, sel_res_params)
 
 			if p['status']=="1":
 				doc_status = "Proposed Resolution"
@@ -4630,18 +5009,25 @@ def save_resolution():
 			elif p['status']=="7":
 				doc_status = "Veto Resolution"
 
-			if p['tracking_no']:
+			if p.get('tracking_no'):
+				tracking_no = validate_string(p['tracking_no'], 50)
+				
+				# Get track_gen_id from tracking number (FIX: removed trailing comma)
 				select_tracking = """
-					select track_gen_id from tbl_document_tracking where tracking_no='"""+str(p['tracking_no'])+"""',
+					SELECT track_gen_id FROM tbl_document_tracking WHERE tracking_no=%s
 				"""
-				rd_sel_tracking = pyread(select_tracking)
+				rd_sel_tracking = pyread_safe(select_tracking, (tracking_no,))
 
-				if len(rd_sel_tracking)>0:
-					insert_tracking_status = """
-						insert into tbl_document_tracking_status  set track_gen_id='"""+str(rd_sel_tracking[0]['track_gen_id'])+"""', status='Approved', date=now()
-					"""
-				cud(insert_tracking_status)
-			return jsonify("Succesfuly Saved")
+				if rd_sel_tracking and len(rd_sel_tracking) > 0:
+					track_gen_id = validate_int(rd_sel_tracking[0].get('track_gen_id', 0))
+					
+					if track_gen_id > 0:
+						insert_tracking_status = """
+							INSERT INTO tbl_document_tracking_status (track_gen_id, status, date)
+							VALUES (%s, %s, NOW())
+						"""
+						cud_safe(insert_tracking_status, (track_gen_id, 'Approved'))
+			return jsonify("Successfully Saved")
 
 		else:
 			prnt_B("Resolution Number Already exists")
@@ -4650,53 +5036,67 @@ def save_resolution():
 	else:
 		categories = str(p['categories'][0]).replace("'",'').replace("[","").replace("]","").replace(" ", "")
 
-		update="""update tbl_resolution set resolution_number='"""+str(p['resolution_no'])+"""', resolution_title='"""+str(resolution_title)+"""', 
-			date_enacted='"""+str(p['date_enacted'])+"""', category='"""+str(categories)+"""', sp_id='"""+str(p['sp_id'])+"""', session_id='"""+str(p['session_id'])+"""',
-			tracking_number='"""+str(p['tracking_no'])+"""', classification_id='"""+str(p['gov_classification'])+"""', source_of_document='"""+str(p['source_of_document'])+"""',
-			source_document_specify='"""+str(p['source_document_specify'])+"""', remarks='"""+str(p['remarks'])+"""', 
-			status='"""+str(p['status'])+"""',description='"""+str(descr)+"""', series_number='"""+str(p['series_number'])+"""'
-			where resolution_id='"""+str(p['resolution_id'])+"""'
+		update="""update tbl_resolution set resolution_number=%s, resolution_title=%s, 
+			date_enacted=%s, category=%s, sp_id=%s, session_id=%s,
+			tracking_number=%s, classification_id=%s, source_of_document=%s,
+			source_document_specify=%s, remarks=%s, 
+			status=%s,description=%s, series_number=%s
+			where resolution_id=%s
 		"""
-		cud(update)
+		update_params = [str(p['resolution_no']), str(resolution_title), str(p['date_enacted']), str(categories), str(p['sp_id']), str(p['session_id']), str(p['tracking_no']), str(p['gov_classification']), str(p['source_of_document']), str(p['source_document_specify']), str(p['remarks']), str(p['status']), str(descr), str(p['series_number']), str(p['resolution_id'])]
+		cud_safe(update, update_params)
 
 		# new update
 
-		delete_authors="delete from tbl_resolution_author where resolution_id='"+str(p['resolution_id'])+"'"
-		cud(delete_authors)
+		delete_authors="""delete from tbl_resolution_author where resolution_id=%s"""
+		delete_authors_params = [str(p['resolution_id'])]
+		cud_safe(delete_authors, delete_authors_params)
 
-		delete_co_authors="delete from tbl_resolution_co_author where resolution_id='"+str(p['resolution_id'])+"'"
-		cud(delete_co_authors)
+		delete_co_authors="""delete from tbl_resolution_co_author where resolution_id=%s"""
+		delete_co_authors_params = [str(p['resolution_id'])]
+		cud_safe(delete_co_authors, delete_co_authors_params)
 
-		delete_sponsor="delete from tbl_resolution_sponsor where resolution_id='"+str(p['resolution_id'])+"'"
-		cud(delete_sponsor)
+		delete_sponsor="""delete from tbl_resolution_sponsor where resolution_id=%s"""
+		delete_sponsor_params = [str(p['resolution_id'])]
+		cud_safe(delete_sponsor, delete_sponsor_params)
 
-		delete_committee="delete from tbl_committee_ref_resolution where resolution_id='"+str(p['resolution_id'])+"'"
-		cud(delete_committee)
+		delete_cosponsor="""delete from tbl_resolution_cosponsor where resolution_id=%s"""
+		delete_cosponsor_params = [str(p['resolution_id'])]
+		cud_safe(delete_cosponsor, delete_cosponsor_params)
+
+		delete_committee="""delete from tbl_committee_ref_resolution where resolution_id=%s"""
+		delete_committee_params = [str(p['resolution_id'])]
+		cud_safe(delete_committee, delete_committee_params)
 
 		for i in p['ref_committee'][0]:
-			insert_committee="insert into tbl_committee_ref_resolution set  committee_id='"+str(i)+"', resolution_id='"+str(p['resolution_id'])+"', date_reffered=now()"
-			cud(insert_committee)
+			insert_committee="""insert into tbl_committee_ref_resolution set  committee_id=%s, resolution_id=%s, date_reffered=now()"""
+			insert_committee_params = [str(i), str(p['resolution_id'])]
+			cud_safe(insert_committee, insert_committee_params)
 
 
 		if 'input_authors' in p:
 			for i in p['input_authors']:
-				insert_author="insert into tbl_resolution_author set author='"+str(i)+"', resolution_id='"+str(p['resolution_id'])+"'"
-				cud(insert_author)
+				insert_author="""insert into tbl_resolution_author set author=%s, resolution_id=%s"""
+				insert_author_params = [str(i), str(p['resolution_id'])]
+				cud_safe(insert_author, insert_author_params)
 
 		if 'input_co_authors' in p:
 			for i in p['input_co_authors']:
-				insert_co_author="insert into tbl_resolution_co_author set co_author='"+str(i)+"', resolution_id='"+str(p['resolution_id'])+"'"
-				cud(insert_co_author)
+				insert_co_author="""insert into tbl_resolution_co_author set co_author=%s, resolution_id=%s"""
+				insert_co_author_params = [str(i), str(p['resolution_id'])]
+				cud_safe(insert_co_author, insert_co_author_params)
 
 		if 'input_sponsor' in p:
 			for i in p['input_sponsor']:
-				insert_sponsor="insert into tbl_resolution_sponsor set sponsor='"+str(i)+"', resolution_id='"+str(p['resolution_id'])+"'"
-				cud(insert_sponsor)
+				insert_sponsor="""insert into tbl_resolution_sponsor set sponsor=%s, resolution_id=%s"""
+				insert_sponsor_params = [str(i), str(p['resolution_id'])]
+				cud_safe(insert_sponsor, insert_sponsor_params)
 
 		if 'input_cosponsor' in p:
 			for i in p['input_cosponsor']:
-				insert_cosponsor="insert into tbl_resolution_cosponsor set cosponsor='"+str(i)+"', resolution_id='"+str(p['resolution_id'])+"'"
-				cud(insert_cosponsor)
+				insert_cosponsor="""insert into tbl_resolution_cosponsor set cosponsor=%s, resolution_id=%s"""
+				insert_cosponsor_params = [str(i), str(p['resolution_id'])]
+				cud_safe(insert_cosponsor, insert_cosponsor_params)
 
 		x=-1
 		y=-1
@@ -4713,7 +5113,7 @@ def save_resolution():
 				n_path.resolve()
 				
 				if file and allowed_file(file.filename):
-					filename = str(custom_secure_filename(file.filename)).replace("'","''")
+					filename = str(custom_secure_filename(file.filename))
 					if not Path.exists(n_path):
 						Path.mkdir(n_path)
 						app.config['UPLOAD_FOLDER']=n_path
@@ -4726,9 +5126,10 @@ def save_resolution():
 					location1.replace("//", "\\\\");
 					location=location1+"/"+filename
 					path_location=location.replace("/", "\\\\");
-					file_ = str(file.filename).replace("'","''")
-					insert2="insert into tbl_resolution_file set filename='"+str(file_)+"', path='"+str(path_location)+"', resolution_id='"+str(p['resolution_id'])+"'"
-					cud(insert2)
+					file_ = str(file.filename)
+					insert2="""insert into tbl_resolution_file set filename=%s, path=%s, resolution_id=%s"""
+					insert2_params = [str(file_), str(path_location), str(p['resolution_id'])]
+					cud_safe(insert2, insert2_params)
 
 				# file minutes  ---------------------------------->
 
@@ -4741,7 +5142,7 @@ def save_resolution():
 				n_path.resolve()
 				
 				if file and allowed_file(file.filename):
-					filename = str(custom_secure_filename(file.filename)).replace("'","''")
+					filename = str(custom_secure_filename(file.filename))
 					if not Path.exists(n_path):
 						Path.mkdir(n_path)
 						app.config['UPLOAD_FOLDER']=n_path
@@ -4754,9 +5155,10 @@ def save_resolution():
 					location1.replace("//", "\\\\");
 					location=location1+"/"+filename
 					path_location=location.replace("/", "\\\\");
-					file_ = str(file.filename).replace("'","''")
-					insert_tbl_minutes_path="insert into tbl_minutes_resolution_path set filename='"+str(file_)+"', path='"+str(path_location)+"', minutes_id='"+str(p['resolution_id'])+"'"
-					cud(insert_tbl_minutes_path)
+					file_ = str(file.filename)
+					insert_tbl_minutes_path="""insert into tbl_minutes_resolution_path set filename=%s, path=%s, minutes_id=%s"""
+					insert_tbl_minutes_path_params = [str(file_), str(path_location), str(p['resolution_id'])]
+					cud_safe(insert_tbl_minutes_path, insert_tbl_minutes_path_params)
 
 			if str(split[0])=="file_veto":
 				z=z+1
@@ -4767,7 +5169,7 @@ def save_resolution():
 				n_path.resolve()
 				
 				if file and allowed_file(file.filename):
-					filename = str(custom_secure_filename(file.filename)).replace("'","''")
+					filename = str(custom_secure_filename(file.filename))
 					if not Path.exists(n_path):
 						Path.mkdir(n_path)
 						app.config['UPLOAD_FOLDER']=n_path
@@ -4780,12 +5182,14 @@ def save_resolution():
 					location1.replace("//", "\\\\");
 					location=location1+"/"+filename
 					path_location=location.replace("/", "\\\\");
-					file_ = str(file.filename).replace("'","''")
-					insert_veto="insert into tbl_veto_resolution set filename='"+str(file_)+"', path='"+str(path_location)+"', resolution_id='"+str(p['resolution_id'])+"'"
-					cud(insert_veto)
+					file_ = str(file.filename)
+					insert_veto="""insert into tbl_veto_resolution set filename=%s, path=%s, resolution_id=%s"""
+					insert_veto_params = [str(file_), str(path_location), str(p['resolution_id'])]
+					cud_safe(insert_veto, insert_veto_params)
 
-		sel_res="select * from tbl_resolution where resolution_id='"+str(p['resolution_id'])+"'"
-		rd_reso=pyread(sel_res)
+		sel_res="""select * from tbl_resolution where resolution_id=%s"""
+		sel_res_params = [str(p['resolution_id'])]
+		rd_reso=pyread_safe(sel_res, sel_res_params)
 
 		if p['status']=="1":
 			doc_status = "Proposed Resolution"
@@ -4802,19 +5206,26 @@ def save_resolution():
 		elif p['status']=="7":
 			doc_status = "Veto Resolution"
 
-		if p['tracking_no']:
-			select_tracking = """
-				select track_gen_id from tbl_document_tracking where tracking_no='"""+str(p['tracking_no'])+"""',
-			"""
-			rd_sel_tracking = pyread(select_tracking)
-
+		if p.get('tracking_no'):
+			tracking_no = validate_string(p['tracking_no'], 50)
 			
-			insert_tracking_status = """
-				insert into tbl_document_tracking_status  set track_gen_id='"""+str(rd_sel_tracking[0]['track_gen_id'])+"""', status='Approved', date=now()
+			# Get track_gen_id from tracking number (FIX: removed trailing comma)
+			select_tracking = """
+				SELECT track_gen_id FROM tbl_document_tracking WHERE tracking_no=%s
 			"""
-			cud(insert_tracking_status)
+			rd_sel_tracking = pyread_safe(select_tracking, (tracking_no,))
 
-		return jsonify("Succesfuly Updated")
+			if rd_sel_tracking and len(rd_sel_tracking) > 0:
+				track_gen_id = validate_int(rd_sel_tracking[0].get('track_gen_id', 0))
+				
+				if track_gen_id > 0:
+					insert_tracking_status = """
+						INSERT INTO tbl_document_tracking_status (track_gen_id, status, date)
+						VALUES (%s, %s, NOW())
+					"""
+					cud_safe(insert_tracking_status, (track_gen_id, 'Approved'))
+
+		return jsonify("Successfully Updated")
 
 
 @query.route('/save_new_password', methods=['GET', 'POST'])
@@ -4823,19 +5234,22 @@ def save_new_password():
 	p=json.loads(request.data)
 	if p['h_user']=="0" or p['h_user']==0:
 		if str(p['new_pass'])==str(p['confirm_pass']):
-			insert="insert into tbl_login set username='"+str(p['new_username'])+"',password='"+str(p['confirm_pass'])+"',fullname='"+str(p['fullname'])+"',type=1"
-			cud(insert)
+			insert="""insert into tbl_login set username=%s,password=%s,fullname=%s,type=1"""
+			insert_params = [str(p['new_username']), str(p['confirm_pass']), str(p['fullname'])]
+			cud_safe(insert, insert_params)
 			return jsonify("Succesfuly Saved")
 		else:
 			return jsonify("Password did not match")
 	else:
-		sel="select * from tbl_login where password='"+str(p['old_pass'])+"'"
-		rd=pyread(sel)
+		sel="""select * from tbl_login where password=%s"""
+		sel_params = [str(p['old_pass'])]
+		rd=pyread_safe(sel, sel_params)
 		if rd:
 			if str(rd[0]['username'])!="":
 				if str(p['new_pass'])==str(p['confirm_pass']):
-					update="update tbl_login set username='"+str(p['new_username'])+"', password='"+str(p['confirm_pass'])+"', fullname='"+str(p['fullname'])+"' where login_id='"+str(p['h_user'])+"'"
-					cud(update)
+					update="""update tbl_login set username=%s, password=%s, fullname=%s where login_id=%s"""
+					update_params = [str(p['new_username']), str(p['confirm_pass']), str(p['fullname']), str(p['h_user'])]
+					cud_safe(update, update_params)
 					return jsonify("Succesfuly Updated")
 				else:
 					return jsonify("Password did not match")
@@ -4848,8 +5262,9 @@ def save_new_password():
 def delete_user():
 	try:
 		p  = json.loads(request.data)
-		del_f = "delete from tbl_login where login_id = '"+str(p['h_user'])+"'"
-		cud(del_f)
+		del_f = """delete from tbl_login where login_id = %s"""
+		del_f_params = [str(p['h_user'])]
+		cud_safe(del_f, del_f_params)
 		return jsonify("Deleted Succesfuly")
 	except Exception as e:
 		return e
@@ -4859,20 +5274,23 @@ def delete_user():
 @login_required
 def delete_ordinance_file():
 	p=json.loads(request.data)
-	sel="select * from tbl_ordinance_file where ordinance_file_id='"+str(p['ordinance_file_id'])+"'"
-	rd=pyread(sel)
+	sel="""select * from tbl_ordinance_file where ordinance_file_id=%s"""
+	sel_params = [str(p['ordinance_file_id'])]
+	rd=pyread_safe(sel, sel_params)
 	if rd:
 		n_path = Path(__file__).parent / "../static/uploads/" / rd[0]['path']
 		n_path.resolve()
 		if Path(n_path).is_file():
 			Path(n_path).unlink()
-			delete="delete from tbl_ordinance_file where ordinance_file_id='"+str(p['ordinance_file_id'])+"'"
-			cud(delete)
+			delete="""delete from tbl_ordinance_file where ordinance_file_id=%s"""
+			delete_params = [str(p['ordinance_file_id'])]
+			cud_safe(delete, delete_params)
 
 			return jsonify("Succesfuly Deleted")
 		else:
-			delete="delete from tbl_ordinance_file where ordinance_file_id='"+str(p['ordinance_file_id'])+"'"
-			cud(delete)
+			delete="""delete from tbl_ordinance_file where ordinance_file_id=%s"""
+			delete_params = [str(p['ordinance_file_id'])]
+			cud_safe(delete, delete_params)
 			return jsonify("File does not exist")
 	else:
 		return jsonify("Not exists in database")
@@ -4882,20 +5300,23 @@ def delete_ordinance_file():
 @login_required
 def delete_resolution_file():
 	p=json.loads(request.data)
-	sel="select * from tbl_resolution_file where resolution_file_id='"+str(p['resolution_file_id'])+"'"
-	rd=pyread(sel)
+	sel="""select * from tbl_resolution_file where resolution_file_id=%s"""
+	sel_params = [str(p['resolution_file_id'])]
+	rd=pyread_safe(sel, sel_params)
 	if rd:
 		n_path = Path(__file__).parent / "../static/uploads/" / rd[0]['path']
 		n_path.resolve()
 		if Path(n_path).is_file():
 			Path(n_path).unlink()
-			delete="delete from tbl_resolution_file where resolution_file_id='"+str(p['resolution_file_id'])+"'"
-			cud(delete)
+			delete="""delete from tbl_resolution_file where resolution_file_id=%s"""
+			delete_params = [str(p['resolution_file_id'])]
+			cud_safe(delete, delete_params)
 
 			return jsonify("Succesfuly Deleted")
 		else:
-			delete="delete from tbl_resolution_file where resolution_file_id='"+str(p['resolution_file_id'])+"'"
-			cud(delete)
+			delete="""delete from tbl_resolution_file where resolution_file_id=%s"""
+			delete_params = [str(p['resolution_file_id'])]
+			cud_safe(delete, delete_params)
 			return jsonify("File does not exist")
 	else:
 		return jsonify("Not exists in database")
@@ -4907,9 +5328,10 @@ def delete_committee_ordinance_minutes():
 	p=json.loads(request.data)
 	sel="""
 		select * from tbl_minutes_path_committee_ordinance 
-		where ordinance_minutes_committee_id='"""+str(p['ordinance_minutes_committee_id'])+"""'
+		where ordinance_minutes_committee_id=%s
 	"""
-	rd=pyread(sel)
+	sel_params = [str(p['ordinance_minutes_committee_id'])]
+	rd=pyread_safe(sel, sel_params)
 	if rd:
 		n_path = Path(__file__).parent / "../static/uploads/" / "upload_committee_ordinance_minutes_files"
 		n_path.resolve()
@@ -4917,16 +5339,18 @@ def delete_committee_ordinance_minutes():
 			Path(n_path).unlink()
 			delete="""
 				delete from tbl_minutes_path_committee_ordinance 
-				where ordinance_minutes_committee_id='"""+str(p['ordinance_minutes_committee_id'])+"""'
+				where ordinance_minutes_committee_id=%s
 			"""
-			cud(delete)
+			delete_params = [str(p['ordinance_minutes_committee_id'])]
+			cud_safe(delete, delete_params)
 			return jsonify("Succesfuly Deleted")
 		else:
 			delete="""
 				delete from tbl_minutes_path_committee_ordinance 
-				where ordinance_minutes_committee_id='"""+str(p['ordinance_minutes_committee_id'])+"""'
+				where ordinance_minutes_committee_id=%s
 			"""
-			cud(delete)
+			delete_params = [str(p['ordinance_minutes_committee_id'])]
+			cud_safe(delete, delete_params)
 			return jsonify("File does not exist")
 	else:
 		return jsonify("Not exists in database")
@@ -4938,9 +5362,10 @@ def delete_committee_resolution_minutes():
 	p=json.loads(request.data)
 	sel="""
 		select * from tbl_minutes_path_committee_resolution 
-		where minutes_path_committee_resolution_id='"""+str(p['minutes_path_committee_resolution_id'])+"""'
+		where minutes_path_committee_resolution_id=%s
 	"""
-	rd=pyread(sel)
+	sel_params = [str(p['minutes_path_committee_resolution_id'])]
+	rd=pyread_safe(sel, sel_params)
 	if rd:
 		n_path = Path(__file__).parent / "../static/uploads/" / "upload_committee_resolution_minutes_files"
 		n_path.resolve()
@@ -4948,16 +5373,18 @@ def delete_committee_resolution_minutes():
 			Path(n_path).unlink()
 			delete="""
 				delete from tbl_minutes_path_committee_resolution 
-				where minutes_path_committee_resolution_id='"""+str(p['minutes_path_committee_resolution_id'])+"""'
+				where minutes_path_committee_resolution_id=%s
 			"""
-			cud(delete)
+			delete_params = [str(p['minutes_path_committee_resolution_id'])]
+			cud_safe(delete, delete_params)
 			return jsonify("Succesfuly Deleted")
 		else:
 			delete="""
 				delete from tbl_minutes_path_committee_resolution 
-				where minutes_path_committee_resolution_id='"""+str(p['minutes_path_committee_resolution_id'])+"""'
+				where minutes_path_committee_resolution_id=%s
 			"""
-			cud(delete)
+			delete_params = [str(p['minutes_path_committee_resolution_id'])]
+			cud_safe(delete, delete_params)
 			return jsonify("File does not exist")
 	else:
 		return jsonify("Not exists in database")
@@ -4969,9 +5396,10 @@ def delete_committee_petition_minutes_file():
 	p=json.loads(request.data)
 	sel="""
 		select * from tbl_minutes_path_committee_petition 
-		where minutes_path_committee_petition_id='"""+str(p['minutes_path_committee_petition_id'])+"""'
+		where minutes_path_committee_petition_id=%s
 	"""
-	rd=pyread(sel)
+	sel_params = [str(p['minutes_path_committee_petition_id'])]
+	rd=pyread_safe(sel, sel_params)
 	if rd:
 		n_path = Path(__file__).parent / "../static/uploads/" / "upload_committee_petition_minutes_files"
 		n_path.resolve()
@@ -4979,16 +5407,18 @@ def delete_committee_petition_minutes_file():
 			Path(n_path).unlink()
 			delete="""
 				delete from tbl_minutes_path_committee_petition 
-				where minutes_path_committee_petition_id='"""+str(p['minutes_path_committee_petition_id'])+"""'
+				where minutes_path_committee_petition_id=%s
 			"""
-			cud(delete)
+			delete_params = [str(p['minutes_path_committee_petition_id'])]
+			cud_safe(delete, delete_params)
 			return jsonify("Succesfuly Deleted")
 		else:
 			delete="""
 				delete from tbl_minutes_path_committee_petition 
-				where minutes_path_committee_petition_id='"""+str(p['minutes_path_committee_petition_id'])+"""'
+				where minutes_path_committee_petition_id=%s
 			"""
-			cud(delete)
+			delete_params = [str(p['minutes_path_committee_petition_id'])]
+			cud_safe(delete, delete_params)
 			return jsonify("File does not exist")
 	else:
 		return jsonify("Not exists in database")
@@ -4999,10 +5429,11 @@ def delete_committee_ordinance_file():
 	p=json.loads(request.data)
 	sel="""
 		select * from tbl_ordinance_file_committee 
-		where ordinance_id='"""+str(p['ordinance_id'])+"""' and
-		committee_id='"""+str(p['committee_id'])+"""' and ordinance_file_committee_id='"""+str(p['ordinance_file_committee_id'])+"""'
+		where ordinance_id=%s and
+		committee_id=%s and ordinance_file_committee_id=%s
 	"""
-	rd=pyread(sel)
+	sel_params = [str(p['ordinance_id']), str(p['committee_id']), str(p['ordinance_file_committee_id'])]
+	rd=pyread_safe(sel, sel_params)
 	if rd:
 		n_path = Path(__file__).parent / "../static/uploads/" / "upload_committee_ordinance_files"
 		n_path.resolve()
@@ -5010,18 +5441,20 @@ def delete_committee_ordinance_file():
 			Path(n_path).unlink()
 			delete="""
 				delete from tbl_ordinance_file_committee 
-				where ordinance_id='"""+str(p['ordinance_id'])+"""' and committee_id='"""+str(p['committee_id'])+"""'
-				and ordinance_file_committee_id='"""+str(p['ordinance_file_committee_id'])+"""'
+				where ordinance_id=%s and committee_id=%s
+				and ordinance_file_committee_id=%s
 			"""
-			cud(delete)
+			delete_params = [str(p['ordinance_id']), str(p['committee_id']), str(p['ordinance_file_committee_id'])]
+			cud_safe(delete, delete_params)
 			return jsonify("Succesfuly Deleted")
 		else:
 			delete="""
 				delete from tbl_ordinance_file_committee 
-				where ordinance_id='"""+str(p['ordinance_id'])+"""' and committee_id='"""+str(p['committee_id'])+"""'
-				and ordinance_file_committee_id='"""+str(p['ordinance_file_committee_id'])+"""'
+				where ordinance_id=%s and committee_id=%s
+				and ordinance_file_committee_id=%s
 			"""
-			cud(delete)
+			delete_params = [str(p['ordinance_id']), str(p['committee_id']), str(p['ordinance_file_committee_id'])]
+			cud_safe(delete, delete_params)
 			return jsonify("File does not exist")
 	else:
 		return jsonify("Not exists in database")
@@ -5033,10 +5466,11 @@ def delete_committee_resolution_file():
 	p=json.loads(request.data)
 	sel="""
 		select * from tbl_resolution_file_committee 
-		where resolution_id='"""+str(p['resolution_id'])+"""' and
-		committee_id='"""+str(p['committee_id'])+"""' and resolution_file_committee_id='"""+str(p['resolution_file_committee_id'])+"""'
+		where resolution_id=%s and
+		committee_id=%s and resolution_file_committee_id=%s
 	"""
-	rd=pyread(sel)
+	sel_params = [str(p['resolution_id']), str(p['committee_id']), str(p['resolution_file_committee_id'])]
+	rd=pyread_safe(sel, sel_params)
 	if rd:
 		n_path = Path(__file__).parent / "../static/uploads/" / "upload_committee_resolution_files"
 		n_path.resolve()
@@ -5044,18 +5478,20 @@ def delete_committee_resolution_file():
 			Path(n_path).unlink()
 			delete="""
 				delete from tbl_resolution_file_committee 
-				where resolution_id='"""+str(p['resolution_id'])+"""' and committee_id='"""+str(p['committee_id'])+"""'
-				and resolution_file_committee_id='"""+str(p['resolution_file_committee_id'])+"""'
+				where resolution_id=%s and committee_id=%s
+				and resolution_file_committee_id=%s
 			"""
-			cud(delete)
+			delete_params = [str(p['resolution_id']), str(p['committee_id']), str(p['resolution_file_committee_id'])]
+			cud_safe(delete, delete_params)
 			return jsonify("Succesfuly Deleted")
 		else:
 			delete="""
 				delete from tbl_resolution_file_committee 
-				where resolution_id='"""+str(p['resolution_id'])+"""' and committee_id='"""+str(p['committee_id'])+"""'
-				and resolution_file_committee_id='"""+str(p['resolution_file_committee_id'])+"""'
+				where resolution_id=%s and committee_id=%s
+				and resolution_file_committee_id=%s
 			"""
-			cud(delete)
+			delete_params = [str(p['resolution_id']), str(p['committee_id']), str(p['resolution_file_committee_id'])]
+			cud_safe(delete, delete_params)
 			return jsonify("File does not exist")
 	else:
 		return jsonify("Not exists in database")
@@ -5067,10 +5503,11 @@ def delete_committee_petition_file():
 	p=json.loads(request.data)
 	sel="""
 		select * from tbl_petition_path_committee 
-		where petition_id='"""+str(p['petition_id'])+"""' and
-		committee_id='"""+str(p['committee_id'])+"""' and petition_path_committee_id='"""+str(p['petition_path_committee_id'])+"""'
+		where petition_id=%s and
+		committee_id=%s and petition_path_committee_id=%s
 	"""
-	rd=pyread(sel)
+	sel_params = [str(p['petition_id']), str(p['committee_id']), str(p['petition_path_committee_id'])]
+	rd=pyread_safe(sel, sel_params)
 	if rd:
 		n_path = Path(__file__).parent / "../static/uploads/" / "upload_committee_petition_files"
 		n_path.resolve()
@@ -5078,18 +5515,20 @@ def delete_committee_petition_file():
 			Path(n_path).unlink()
 			delete="""
 				delete from tbl_petition_path_committee 
-				where petition_id='"""+str(p['petition_id'])+"""' and committee_id='"""+str(p['committee_id'])+"""'
-				and petition_path_committee_id='"""+str(p['petition_path_committee_id'])+"""'
+				where petition_id=%s and committee_id=%s
+				and petition_path_committee_id=%s
 			"""
-			cud(delete)
+			delete_params = [str(p['petition_id']), str(p['committee_id']), str(p['petition_path_committee_id'])]
+			cud_safe(delete, delete_params)
 			return jsonify("Succesfuly Deleted")
 		else:
 			delete="""
 				delete from tbl_petition_path_committee 
-				where petition_id='"""+str(p['petition_id'])+"""' and committee_id='"""+str(p['committee_id'])+"""'
-				and petition_path_committee_id='"""+str(p['petition_path_committee_id'])+"""'
+				where petition_id=%s and committee_id=%s
+				and petition_path_committee_id=%s
 			"""
-			cud(delete)
+			delete_params = [str(p['petition_id']), str(p['committee_id']), str(p['petition_path_committee_id'])]
+			cud_safe(delete, delete_params)
 			return jsonify("File does not exist")
 	else:
 		return jsonify("Not exists in database")
@@ -5100,9 +5539,10 @@ def delete_committee_petition_file():
 def delete_minutes_file():
 	p=json.loads(request.data)
 	delete = """
-		delete from tbl_minutes_path where minutes_path_id='"""+str(p['minutes_path_id'])+"""'
+		delete from tbl_minutes_path where minutes_path_id=%s
 	"""
-	cud(delete)
+	delete_params = [str(p['minutes_path_id'])]
+	cud_safe(delete, delete_params)
 	return jsonify("Succesfuly deleted")
 
 @query.route('/delete_minutes_file2', methods=['GET', 'POST'])
@@ -5111,9 +5551,10 @@ def delete_minutes_file2():
 	p=json.loads(request.data)
 
 	delete = """
-		delete from tbl_minutes_raw_path where minutes_path_id='"""+str(p['minutes_path_id'])+"""'
+		delete from tbl_minutes_raw_path where minutes_path_id=%s
 	"""
-	cud(delete)
+	delete_params = [str(p['minutes_path_id'])]
+	cud_safe(delete, delete_params)
 	return jsonify("Succesfuly deleted")
 
 
@@ -5121,8 +5562,9 @@ def delete_minutes_file2():
 @login_required
 def delete_veto_ordinance_file():
 	p=json.loads(request.data)
-	delete="delete from tbl_veto_ordinance where veto_ordinance_id='"+str(p['veto_ordinance_id'])+"'"
-	cud(delete)
+	delete="""delete from tbl_veto_ordinance where veto_ordinance_id=%s"""
+	delete_params = [str(p['veto_ordinance_id'])]
+	cud_safe(delete, delete_params)
 	n_path = Path(__file__).parent / "../static/uploads/upload_veto_ordinance" / str(p['ordinance_id'])
 	n_path.resolve()
 	if Path.exists(n_path):
@@ -5134,8 +5576,9 @@ def delete_veto_ordinance_file():
 @login_required
 def delete_veto_resolution_file():
 	p=json.loads(request.data)
-	delete="delete from tbl_veto_resolution where veto_resolution_id='"+str(p['veto_resolution_id'])+"'"
-	cud(delete)
+	delete="""delete from tbl_veto_resolution where veto_resolution_id=%s"""
+	delete_params = [str(p['veto_resolution_id'])]
+	cud_safe(delete, delete_params)
 	n_path = Path(__file__).parent / "../static/uploads/upload_veto_resolution" / str(p['resolution_id'])
 	n_path.resolve()
 	if Path.exists(n_path):
@@ -5163,12 +5606,14 @@ def get_session_data():
 			tbl_session ts
 			LEFT JOIN tbl_personal_info tpi ON ts.closing_prayer = tpi.info_id
 		WHERE
-			session_id ='"""+str(p['session_id'])+"""' """ 
-		res_ses = pyread(sel_session)
+			session_id =%s """
+		sel_session_params = [str(p['session_id'])] 
+		res_ses = pyread_safe(sel_session, sel_session_params)
 
 
-		sel_roll_call = "select *,CONCAT(tri.f_name,' ',tri.m_name, ' ', tri.l_name) as fullname FROM tbl_session_roll_call tsrc LEFT JOIN tbl_personal_info tri on tsrc.info_id = tri.info_id WHERE tsrc.session_id = '"+str(p['session_id'])+"'"
-		res_rl = pyread(sel_roll_call)
+		sel_roll_call = """select *,CONCAT(tri.f_name,' ',tri.m_name, ' ', tri.l_name) as fullname FROM tbl_session_roll_call tsrc LEFT JOIN tbl_personal_info tri on tsrc.info_id = tri.info_id WHERE tsrc.session_id = %s"""
+		sel_roll_call_params = [str(p['session_id'])]
+		res_rl = pyread_safe(sel_roll_call, sel_roll_call_params)
 
 		session_data = {
 			"sess_data": res_ses,
@@ -5189,16 +5634,18 @@ def get_tracking():
 @login_required
 def del_committee():
 	p=json.loads(request.data)
-	delete="delete from tbl_committee where committee_id='"+str(p['committee_id'])+"'" 
-	cud(delete)
+	delete="""delete from tbl_committee where committee_id=%s"""
+	delete_params = [str(p['committee_id'])] 
+	cud_safe(delete, delete_params)
 	return jsonify("Succesfuly Deleted")
 
 @query.route('/delete_accounts', methods=['GET', 'POST'])
 @login_required
 def delete_accounts():
 	p=json.loads(request.data)
-	delete="delete from tbl_personal_info where info_id='"+str(p['info_id'])+"'" 
-	cud(delete)
+	delete="""delete from tbl_personal_info where info_id=%s"""
+	delete_params = [str(p['info_id'])] 
+	cud_safe(delete, delete_params)
 	return jsonify("Succesfuly Deleted")
 
 @query.route('/get_OOB', methods = ['GET','POST'])
@@ -5211,15 +5658,17 @@ def get_OOB():
 				tbl_session ts
 				LEFT JOIN tbl_personal_info tpi ON ts.closing_prayer = tpi.info_id
 			WHERE
-				session_id ='"""+str(p['session_id'])+"""'
+				session_id =%s
 		"""
-		res_ses = pyread(sel_session)
+		sel_session_params = [str(p['session_id'])]
+		res_ses = pyread_safe(sel_session, sel_session_params)
 
 		if len(res_ses)!=0:
 			#  ROLL CALL
 
-			sel_roll_call = "select *,CONCAT(tri.f_name,' ',tri.m_name, ' ', tri.l_name) as fullname FROM tbl_session_roll_call tsrc LEFT JOIN tbl_personal_info tri on tsrc.info_id = tri.info_id WHERE tsrc.session_id = '"+str(res_ses[0]['session_id'])+"'"
-			res_rc = pyread(sel_roll_call)
+			sel_roll_call = """select *,CONCAT(tri.f_name,' ',tri.m_name, ' ', tri.l_name) as fullname FROM tbl_session_roll_call tsrc LEFT JOIN tbl_personal_info tri on tsrc.info_id = tri.info_id WHERE tsrc.session_id = %s"""
+			sel_roll_call_params = [str(res_ses[0]['session_id'])]
+			res_rc = pyread_safe(sel_roll_call, sel_roll_call_params)
 
 			# reading privious minutes
 
@@ -5229,29 +5678,32 @@ def get_OOB():
 				left join tbl_minutes tm on tm.minutes_id=tsrm.minutes_id
 				left join tbl_minutes_path tmrp on tmrp.minutes_id=tm.minutes_id
 				left join tbl_sp ts on ts.sp_id=tm.sp_id
-				where session_id = '"""+str(res_ses[0]['session_id'])+"""'
+				where session_id = %s
 				group by tsrm.minutes_id
 			"""
-			res_priv_min = pyread(sel_priv_min)
+			sel_priv_min_params = [str(res_ses[0]['session_id'])]
+			res_priv_min = pyread_safe(sel_priv_min, sel_priv_min_params)
 
 			# question privilege
 
 			sel_question = """
 				select *, (select path from tbl_session_question_hour_path tsqhp
-				where tsqhp.session_id='"""+str(res_ses[0]['session_id'])+"""' GROUP BY session_id) file
+				where tsqhp.session_id=%s GROUP BY session_id) file
 				from tbl_session_question_hour 
-				where session_id = '"""+str(res_ses[0]['session_id'])+"""'
+				where session_id = %s
 			"""
-			res_ques = pyread(sel_question)
+			sel_question_params = [str(res_ses[0]['session_id']), str(res_ses[0]['session_id'])]
+			res_ques = pyread_safe(sel_question, sel_question_params)
 
 			#  privilege hour
 			sel_privilege_hour = """
 				select path file,concat(tpi.f_name,' ', tpi.m_name,' ', tpi.l_name) councilor from tbl_session_previlege_hour tsph
 			  	left join tbl_personal_info tpi on tpi.info_id=tsph.councilor_info_id
 				left join tbl_session_privilege_path tspp on tspp.previlege_hour_id=tsph.previlege_hour_id
-				where tsph.session_id= '"""+str(res_ses[0]['session_id'])+"""'
+				where tsph.session_id= %s
 			"""
-			res_priv = pyread(sel_privilege_hour)
+			sel_privilege_hour_params = [str(res_ses[0]['session_id'])]
+			res_priv = pyread_safe(sel_privilege_hour, sel_privilege_hour_params)
 
 			# Reading and refferences of bussiness
 
@@ -5267,10 +5719,11 @@ def get_OOB():
 				left join tbl_document_tracking_path tdtp on tdtp.track_gen_id=tdt.track_gen_id
 				left join tbl_document_tracking_refferal tdtr on tdtr.track_gen_id=tdt.track_gen_id
 				left JOIN tbl_committee tc ON FIND_IN_SET(tc.committee_id, REPLACE(tdtr.committtee, " ", ""))
-				where tspo.session_id = '"""+str(res_ses[0]['session_id'])+"""'
+				where tspo.session_id = %s
 				GROUP BY tdt.track_gen_id
 			"""
-			res_rrb_ord = pyread(sel_rrb_ord)
+			sel_rrb_ord_params = [str(res_ses[0]['session_id'])]
+			res_rrb_ord = pyread_safe(sel_rrb_ord, sel_rrb_ord_params)
 
 			# end propose ordinance ---- >
 
@@ -5285,10 +5738,11 @@ def get_OOB():
 				left join tbl_document_tracking_path tdtp on tdtp.track_gen_id=tdt.track_gen_id
 				left join tbl_document_tracking_refferal tdtr on tdtr.track_gen_id=tdt.track_gen_id
 				left JOIN tbl_committee tc ON FIND_IN_SET(tc.committee_id, REPLACE(tdtr.committtee, " ", ""))
-				where tspr.session_id = '"""+str(res_ses[0]['session_id'])+"""'
+				where tspr.session_id = %s
 				GROUP BY tdt.track_gen_id
 			"""
-			res_rrb_res = pyread(sel_rrb_res)
+			sel_rrb_res_params = [str(res_ses[0]['session_id'])]
+			res_rrb_res = pyread_safe(sel_rrb_res, sel_rrb_res_params)
 
 			# end propose resolution ---- >
 
@@ -5303,10 +5757,11 @@ def get_OOB():
 				left join tbl_document_tracking_path tdtp on tdtp.track_gen_id=tdt.track_gen_id
 				left join tbl_document_tracking_refferal tdtr on tdtr.track_gen_id=tdt.track_gen_id
 				left JOIN tbl_committee tc ON FIND_IN_SET(tc.committee_id, REPLACE(tdtr.committtee, " ", ""))
-				where tspfr.session_id = '"""+str(res_ses[0]['session_id'])+"""'
+				where tspfr.session_id = %s
 				GROUP BY tdt.track_gen_id
 			"""
-			res_rrb_pet = pyread(sel_rrb_pet)
+			sel_rrb_pet_params = [str(res_ses[0]['session_id'])]
+			res_rrb_pet = pyread_safe(sel_rrb_pet, sel_rrb_pet_params)
 
 			# end petition ---- >
 
@@ -5321,10 +5776,11 @@ def get_OOB():
 				left join tbl_document_tracking_path tdtp on tdtp.track_gen_id=tdt.track_gen_id
 				left join tbl_document_tracking_refferal tdtr on tdtr.track_gen_id=tdt.track_gen_id
 				left JOIN tbl_committee tc ON FIND_IN_SET(tc.committee_id, REPLACE(tdtr.committtee, " ", ""))
-				where tsar.session_id = '"""+str(res_ses[0]['session_id'])+"""'
+				where tsar.session_id = %s
 				GROUP BY tdt.track_gen_id
 			"""
-			res_rrb_addition = pyread(sel_rrb_addition)
+			sel_rrb_addition_params = [str(res_ses[0]['session_id'])]
+			res_rrb_addition = pyread_safe(sel_rrb_addition, sel_rrb_addition_params)
 
 			# end additional petition ---- >
 
@@ -5339,10 +5795,11 @@ def get_OOB():
 				left join tbl_document_tracking_path tdtp on tdtp.track_gen_id=tdt.track_gen_id
 				left join tbl_document_tracking_refferal tdtr on tdtr.track_gen_id=tdt.track_gen_id
 				left join tbl_committee tc on tc.committee_id=tdtr.committtee
-				where tsvr.session_id = '"""+str(res_ses[0]['session_id'])+"""'
+				where tsvr.session_id = %s
 				GROUP BY tdt.track_gen_id
 			"""
-			res_rrb_veto = pyread(sel_rrb_veto)
+			sel_rrb_veto_params = [str(res_ses[0]['session_id'])]
+			res_rrb_veto = pyread_safe(sel_rrb_veto, sel_rrb_veto_params)
 
 			# end veto message ---- >
 
@@ -5519,10 +5976,11 @@ def get_OOB():
 				left join tbl_document_tracking_path tdtp on tdtp.track_gen_id=tdt.track_gen_id
 				left join tbl_document_tracking_refferal tdtr on tdtr.track_gen_id=tdt.track_gen_id
 				left JOIN tbl_committee tc ON FIND_IN_SET(tc.committee_id, REPLACE(tdtr.committtee, " ", ""))
-				where tsu.session_id = '"""+str(res_ses[0]['session_id'])+"""'
+				where tsu.session_id = %s
 				GROUP BY tdt.track_gen_id
 			"""
-			res_rrb_urgent = pyread(sel_rrb_urgent)
+			sel_rrb_urgent_params = [str(res_ses[0]['session_id'])]
+			res_rrb_urgent = pyread_safe(sel_rrb_urgent, sel_rrb_urgent_params)
 
 			# end urgent ---- >
 
@@ -5537,10 +5995,11 @@ def get_OOB():
 				left join tbl_document_tracking_path tdtp on tdtp.track_gen_id=tdt.track_gen_id
 				left join tbl_document_tracking_refferal tdtr on tdtr.track_gen_id=tdt.track_gen_id
 				left JOIN tbl_committee tc ON FIND_IN_SET(tc.committee_id, REPLACE(tdtr.committtee, " ", ""))
-				where tsji.session_id = '"""+str(res_ses[0]['session_id'])+"""'
+				where tsji.session_id = %s
 				GROUP BY tdt.track_gen_id
 			"""
-			res_rrb_just_inserted = pyread(sel_rrb_just_inserted)
+			sel_rrb_just_inserted_params = [str(res_ses[0]['session_id'])]
+			res_rrb_just_inserted = pyread_safe(sel_rrb_just_inserted, sel_rrb_just_inserted_params)
 
 			# end just inserted ---- >
 
@@ -5556,10 +6015,11 @@ def get_OOB():
 				left join tbl_document_tracking_path tdtp on tdtp.track_gen_id=tdt.track_gen_id
 				left join tbl_document_tracking_refferal tdtr on tdtr.track_gen_id=tdt.track_gen_id
 				left JOIN tbl_committee tc ON FIND_IN_SET(tc.committee_id, REPLACE(tdtr.committtee, " ", ""))
-				where tscm.session_id = '"""+str(res_ses[0]['session_id'])+"""'
+				where tscm.session_id = %s
 				GROUP BY tdt.track_gen_id
 			"""
-			res_rrb_calendar_measure = pyread(sel_rrb_calendar_measure)
+			sel_rrb_calendar_measure_params = [str(res_ses[0]['session_id'])]
+			res_rrb_calendar_measure = pyread_safe(sel_rrb_calendar_measure, sel_rrb_calendar_measure_params)
 
 			# end just inserted ---- >
 
@@ -5575,10 +6035,11 @@ def get_OOB():
 				left join tbl_document_tracking_path tdtp on tdtp.track_gen_id=tdt.track_gen_id
 				left join tbl_document_tracking_refferal tdtr on tdtr.track_gen_id=tdt.track_gen_id
 				left JOIN tbl_committee tc ON FIND_IN_SET(tc.committee_id, REPLACE(tdtr.committtee, " ", ""))
-				where tsnm.session_id = '"""+str(res_ses[0]['session_id'])+"""'
+				where tsnm.session_id = %s
 				GROUP BY tdt.track_gen_id
 			"""
-			res_rrb_new_measure = pyread(sel_rrb_new_measure)
+			sel_rrb_new_measure_params = [str(res_ses[0]['session_id'])]
+			res_rrb_new_measure = pyread_safe(sel_rrb_new_measure, sel_rrb_new_measure_params)
 
 			# end just inserted ---- >
 
@@ -5594,10 +6055,11 @@ def get_OOB():
 				left join tbl_document_tracking_path tdtp on tdtp.track_gen_id=tdt.track_gen_id
 				left join tbl_document_tracking_refferal tdtr on tdtr.track_gen_id=tdt.track_gen_id
 				left join tbl_committee tc on tc.committee_id=tdtr.committtee
-				where tsbt.session_id = '"""+str(res_ses[0]['session_id'])+"""'
+				where tsbt.session_id = %s
 				GROUP BY tdt.track_gen_id
 			"""
-			res_rrb_bussiness_third = pyread(sel_rrb_bussiness_third)
+			sel_rrb_bussiness_third_params = [str(res_ses[0]['session_id'])]
+			res_rrb_bussiness_third = pyread_safe(sel_rrb_bussiness_third, sel_rrb_bussiness_third_params)
 
 			# end just inserted ---- >
 
@@ -5609,9 +6071,10 @@ def get_OOB():
 				select tssc.new_title, tssc.old_title , tdt.tracking_no
 				from tbl_session_summary_correction tssc
 				left join tbl_document_tracking tdt on tdt.track_gen_id=tssc.tracking_no
-				where session_id = '"""+str(res_ses[0]['session_id'])+"""'
+				where session_id = %s
 			"""
-			res_summary = pyread(sel_summary)
+			sel_summary_params = [str(res_ses[0]['session_id'])]
+			res_summary = pyread_safe(sel_summary, sel_summary_params)
 
 			# end summary correction
 
@@ -5620,12 +6083,13 @@ def get_OOB():
 			sel_announcement= """
 				select CONCAT(tpi.f_name,' ',tpi.m_name, ' ', tpi.l_name) as fullname,announcement ,
 				(select group_concat(path) from tbl_session_announcement_path tsap 
-				where tsap.session_id='"""+str(res_ses[0]['session_id'])+"""') file
+				where tsap.session_id=%s) file
 				from tbl_session_announcement tsa
 				left join tbl_personal_info tpi on tpi.info_id=tsa.councilor
-				where tsa.session_id = '"""+str(res_ses[0]['session_id'])+"""'
+				where tsa.session_id = %s
 			"""
-			res_announcement = pyread(sel_announcement)
+			sel_announcement_params = [str(res_ses[0]['session_id']), str(res_ses[0]['session_id'])]
+			res_announcement = pyread_safe(sel_announcement, sel_announcement_params)
 
 			# Code refferences
 
@@ -5699,9 +6163,10 @@ def get_minuteReading():
 				* 
 			FROM
 				tbl_minutes tm
-				LEFT JOIN tbl_minutes_path tmp ON tm.minutes_id = tmp.minutes_id where `date` = '"""+str(p['minutes_date'])+"""'
+				LEFT JOIN tbl_minutes_path tmp ON tm.minutes_id = tmp.minutes_id where `date` = %s
 		"""
-		res = pyread(sel)
+		sel_params = [str(p['minutes_date'])]
+		res = pyread_safe(sel, sel_params)
 		return jsonify(res)
 	except Exception as e:
 		return e
@@ -5794,26 +6259,30 @@ def save_oob():
 			if p['attendance']:
 				if len(p['attendance'])!=0:
 					for x in p['attendance']:
-						upt = "update tbl_session_roll_call set status = '"+str(x['roll_call'])+"' where roll_call_id = '"+str(x['roll_call_id'])+"' and session_id = '"+str(p['session_id'])+"'"
-						cud(upt)
+						upt = """update tbl_session_roll_call set status = %s where roll_call_id = %s and session_id = %s"""
+						upt_params = [str(x['roll_call']), str(x['roll_call_id']), str(p['session_id'])]
+						cud_safe(upt, upt_params)
 
 			if p['reading']:
 				if len(p['reading']):
 					for x in p['reading']:
-						upt = "update tbl_minutes set movant = '"+str(x['movant'])+"', seconder = '"+str(x['seconder'])+"' where minutes_id = '"+str(x['minutes_id'])+"' "
-						cud(upt)
+						upt = """update tbl_minutes set movant = %s, seconder = %s where minutes_id = %s """
+						upt_params = [str(x['movant']), str(x['seconder']), str(x['minutes_id'])]
+						cud_safe(upt, upt_params)
 
 			if p['proposed_ordinance']:
 				if len(p['proposed_ordinance'])!=0:
 					for x in p['proposed_ordinance']:
-						upt = "update tbl_ordinance set committee_id = '"+str(x['committee'])+"'  where ordinance_id = '"+str(x['ordinance_id'])+"' "
-						cud(upt)
+						upt = """update tbl_ordinance set committee_id = %s  where ordinance_id = %s """
+						upt_params = [str(x['committee']), str(x['ordinance_id'])]
+						cud_safe(upt, upt_params)
 
 			if p['proposed_resolution']:
 				if len(p['proposed_resolution'])!=0:
 					for x in p['proposed_resolution']:
-						upt = "update tbl_resolution set committee_id = '"+str(x['committee'])+"'  where resolution_id = '"+str(x['resolution_id'])+"' "
-						cud(upt)
+						upt = """update tbl_resolution set committee_id = %s  where resolution_id = %s """
+						upt_params = [str(x['committee']), str(x['resolution_id'])]
+						cud_safe(upt, upt_params)
 
 			if p['petition']:
 				if len(p['petition'])!=0:
@@ -5822,8 +6291,9 @@ def save_oob():
 						# cud(upt)
 
 						if x['committee']:
-							upt1 = "update tbl_petition_path_committee set committee_id = '"+str(x['committee'])+"' where petition_id = '"+str(x['petition_id'])+"'"
-							cud(upt1)
+							upt1 = """update tbl_petition_path_committee set committee_id = %s where petition_id = %s"""
+							upt1_params = [str(x['committee']), str(x['petition_id'])]
+							cud_safe(upt1, upt1_params)
 
 			if p['sec_ordinance']:
 				if len(p['sec_ordinance'])!=0:
@@ -5896,21 +6366,24 @@ def get_active_councilor():
 				print('in1')
 				for x in res:
 					print('ordinance')
-					sel2 = "select count(*) total from tbl_ordinance where author = '"+str(x['fullname'])+"' and sp_id = '"+str(res[0]['sp_id'])+"'  and `status` = 6"
-					res2 = pyread(sel2)
+					sel2 = """select count(*) total from tbl_ordinance where author = %s and sp_id = %s  and `status` = 6"""
+					sel2_params = [str(x['fullname']), str(res[0]['sp_id'])]
+					res2 = pyread_safe(sel2, sel2_params)
 					x['ordinance'] = res2
 
 				for y in res:
 					print('reso')
-					sel3 = "select count(*) total from tbl_resolution where author  = '"+str(y['fullname'])+"' and sp_id = '"+str(res[0]['sp_id'])+"' and `status` = 6"
-					res3 = pyread(sel3)
+					sel3 = """select count(*) total from tbl_resolution where author  = %s and sp_id = %s and `status` = 6"""
+					sel3_params = [str(y['fullname']), str(res[0]['sp_id'])]
+					res3 = pyread_safe(sel3, sel3_params)
 					y['resolution'] = res3
 
 
 				for i in res:
 					print('petetion')
-					sel4 = "select count(*) total from tbl_petition where source_of_document = '"+str(i['fullname'])+"' AND action_taken = 1"
-					res4 = pyread(sel4)
+					sel4 = """select count(*) total from tbl_petition where source_of_document = %s AND action_taken = 1"""
+					sel4_params = [str(i['fullname'])]
+					res4 = pyread_safe(sel4, sel4_params)
 					i['petition'] = res4
 		return jsonify(res)
 	except Exception as e:
@@ -5950,11 +6423,13 @@ def get_data_reso_ordi_peti():
 					* 
 				FROM
 					tbl_resolution tr
-					where tr.resolution_id = '"""+str(p['ids'])+"""'
+					where tr.resolution_id = %s
 			"""
-			res = pyread(sel)
-			sel1 = "select * from tbl_minutes_resolution_path where minutes_id = '"+str(res[0]['minutes_id'])+"'"
-			res[0]["minutes_data"] = pyread(sel1)
+			sel_params = [str(p['ids'])]
+			res = pyread_safe(sel, sel_params)
+			sel1 = """select * from tbl_minutes_resolution_path where minutes_id = %s"""
+			sel1_params = [str(res[0]['minutes_id'])]
+			res[0]["minutes_data"] = pyread_safe(sel1, sel1_params)
 		elif p['type_id'] == 2 or p['type_id'] == '2':
 			# ordi
 			sel = """
@@ -5962,11 +6437,13 @@ def get_data_reso_ordi_peti():
 					* 
 				FROM
 					tbl_ordinance `to`
-					where `to`.ordinance_id = '"""+str(p['ids'])+"""'
+					where `to`.ordinance_id = %s
 			"""
-			res = pyread(sel)
-			sel1 = "select * from tbl_minutes_path where minutes_id = '"+str(res[0]['minutes_id'])+"'"
-			res[0]["minutes_data"] = pyread(sel1)
+			sel_params = [str(p['ids'])]
+			res = pyread_safe(sel, sel_params)
+			sel1 = """select * from tbl_minutes_path where minutes_id = %s"""
+			sel1_params = [str(res[0]['minutes_id'])]
+			res[0]["minutes_data"] = pyread_safe(sel1, sel1_params)
 		elif p['type_id'] == 3 or p['type_id'] == '3':
 			# petition
 			sel = """
@@ -5975,11 +6452,13 @@ def get_data_reso_ordi_peti():
 				FROM
 					tbl_petition tp
 					WHERE
-					tp.petition_id = '"""+str(p['ids'])+"""'
+					tp.petition_id = %s
 			"""
-			res = pyread(sel)
-			sel1 = "select * from tbl_petition_path where petition_id = '"+str(res[0]['petition_id'])+"'"
-			res[0]["petition_data"] = pyread(sel1)
+			sel_params = [str(p['ids'])]
+			res = pyread_safe(sel, sel_params)
+			sel1 = """select * from tbl_petition_path where petition_id = %s"""
+			sel1_params = [str(res[0]['petition_id'])]
+			res[0]["petition_data"] = pyread_safe(sel1, sel1_params)
 		return jsonify(res)
 	except Exception as e:
 		return e
@@ -6128,10 +6607,12 @@ def get_report_integrated():
 def delete_budget():
 	try:
 		p = json.loads(request.data)
-		del_b = "delete from tbl_sp_budget where sp_budget_id = '"+p['budget_id']+"'"
-		cud(del_b)
-		delete="delete from tbl_sp_budget_balance where sp_budget_id='"+str(p['budget_id'])+"'"
-		cud(delete)
+		del_b = """delete from tbl_sp_budget where sp_budget_id = %s"""
+		del_b_params = [p['budget_id']]
+		cud_safe(del_b, del_b_params)
+		delete="""delete from tbl_sp_budget_balance where sp_budget_id=%s"""
+		delete_params = [str(p['budget_id'])]
+		cud_safe(delete, delete_params)
 		return jsonify("Deleted Succesfuly")
 	except Exception as e:
 		return e
@@ -6149,12 +6630,14 @@ def get_tbl_announcement():
 def save_announcement():
 	p = json.loads(request.data)
 	if p['h_announce_id']=="0" or p['h_announce_id']=="0":
-		insert="insert into tbl_announcement set announcement_title='"+str(p['title'])+"', announcement='"+str(p['announcement'])+"', status='"+str(p['status_annoucement'])+"', date_announce=curdate()"
-		cud(insert)
+		insert="""insert into tbl_announcement set announcement_title=%s, announcement=%s, status=%s, date_announce=curdate()"""
+		insert_params = [str(p['title']), str(p['announcement']), str(p['status_annoucement'])]
+		cud_safe(insert, insert_params)
 		return jsonify("Succesfuly Saved")
 	else:
-		update="update tbl_announcement set announcement_title='"+str(p['title'])+"', announcement='"+str(p['announcement'])+"', status='"+str(p['status_annoucement'])+"', date_announce=curdate() where announcement_id='"+str(p['h_announce_id'])+"'"
-		cud(update)
+		update="""update tbl_announcement set announcement_title=%s, announcement=%s, status=%s, date_announce=curdate() where announcement_id=%s"""
+		update_params = [str(p['title']), str(p['announcement']), str(p['status_annoucement']), str(p['h_announce_id'])]
+		cud_safe(update, update_params)
 		return jsonify("Succesfuly Saved")
 
 
@@ -6162,8 +6645,9 @@ def save_announcement():
 @login_required
 def delete_announcement():
 	p = json.loads(request.data)
-	delete="delete from tbl_announcement where announcement_id='"+str(p['announcement_id'])+"'"
-	cud(delete)
+	delete="""delete from tbl_announcement where announcement_id=%s"""
+	delete_params = [str(p['announcement_id'])]
+	cud_safe(delete, delete_params)
 	return jsonify("Succesfuly Saved")
 
 @query.route('/get_announcement', methods = ['POST','GET'])
@@ -6247,8 +6731,9 @@ def function():
 			FROM
 			tbl_session ts
 			LEFT JOIN tbl_sp tp ON tp.sp_id = ts.sp_number
-		where tp.sp_id = '"""+str(p['sp_id'])+"""' """
-		return jsonify(pyread(sel))
+		where tp.sp_id = %s """
+		sel_params = [str(p['sp_id'])]
+		return jsonify(pyread_safe(sel, sel_params))
 	except Exception as e:
 		return e
 
@@ -6259,9 +6744,10 @@ def get_session_active():
 		p = json.loads(request.data)
 		sel = """
 			SELECT * FROM tbl_session ts
-			where ts.sp_number = '"""+str(p['sp_id'])+"""' 
+			where ts.sp_number = %s 
 		"""
-		return jsonify(pyread(sel))
+		sel_params = [str(p['sp_id'])]
+		return jsonify(pyread_safe(sel, sel_params))
 	except Exception as e:
 		return e
 
@@ -6353,12 +6839,14 @@ def get_code_and_references_and_file():
 def save_email():
 	p=json.loads(request.data)
 	if p['gmail_id']==0 or p['gmail_id']=="0":
-		insert="insert into tbl_gmail set email='"+str(p['email'])+"', password='"+str(p['password'])+"'"
-		cud(insert)
+		insert="""insert into tbl_gmail set email=%s, password=%s"""
+		insert_params = [str(p['email']), str(p['password'])]
+		cud_safe(insert, insert_params)
 		return jsonify("Successfully saved")
 	else:
-		update="update tbl_gmail set email='"+str(p['email'])+"', password='"+str(p['password'])+"' where email_id='"+str(p['gmail_id'])+"'"
-		cud(update)
+		update="""update tbl_gmail set email=%s, password=%s where email_id=%s"""
+		update_params = [str(p['email']), str(p['password']), str(p['gmail_id'])]
+		cud_safe(update, update_params)
 		return jsonify("Successfully updated")
 
 
@@ -6513,8 +7001,9 @@ def get_landing_minutes():
 def remove_visitor():
 	try:
 		p = json.loads(request.data)
-		del_q = "delete from tbl_session_visitor where visitor_id = '"+str(p['visitor_id'])+"'"
-		cud(del_q)
+		del_q = """delete from tbl_session_visitor where visitor_id = %s"""
+		del_q_params = [str(p['visitor_id'])]
+		cud_safe(del_q, del_q_params)
 		return jsonify("success")
 	except Exception as e:
 		prnt_R(e)
@@ -6525,8 +7014,9 @@ def remove_visitor():
 def remove_privilege():
 	try:
 		p = json.loads(request.data);
-		del_q = "delete from tbl_session_previlege_hour where previlege_hour_id = '"+str(p['priv_id'])+"'"
-		cud(del_q)
+		del_q = """delete from tbl_session_previlege_hour where previlege_hour_id = %s"""
+		del_q_params = [str(p['priv_id'])]
+		cud_safe(del_q, del_q_params)
 		return jsonify("success")
 	except Exception as e:
 		prnt_R(e)
@@ -6562,12 +7052,14 @@ def get_city_name():
 def save_city_name():
 	p=json.loads(request.data)
 	if p['h_config_info_id1']==0 or p['h_config_info_id1']=="0":
-		insert="insert into tbl_config_info set city_name='"+str(p['city_name'])+"'"
-		cud(insert)
+		insert="""insert into tbl_config_info set city_name=%s"""
+		insert_params = [str(p['city_name'])]
+		cud_safe(insert, insert_params)
 		return jsonify("Successfully saved")
 	else:
-		update="update tbl_config_info set city_name='"+str(p['city_name'])+"' where config_info_id='"+str(p['h_config_info_id1'])+"'"
-		cud(update)
+		update="""update tbl_config_info set city_name=%s where config_info_id=%s"""
+		update_params = [str(p['city_name']), str(p['h_config_info_id1'])]
+		cud_safe(update, update_params)
 		return jsonify("Successfully updated")
 
 
@@ -6576,12 +7068,14 @@ def save_city_name():
 def save_province():
 	p=json.loads(request.data)
 	if p['h_config_info_id1']==0 or p['h_config_info_id1']=="0":
-		insert="insert into tbl_config_info set province='"+str(p['province'])+"'"
-		cud(insert)
+		insert="""insert into tbl_config_info set province=%s"""
+		insert_params = [str(p['province'])]
+		cud_safe(insert, insert_params)
 		return jsonify("Successfully saved")
 	else:
-		update="update tbl_config_info set province='"+str(p['province'])+"' where config_info_id='"+str(p['h_config_info_id1'])+"'"
-		cud(update)
+		update="""update tbl_config_info set province=%s where config_info_id=%s"""
+		update_params = [str(p['province']), str(p['h_config_info_id1'])]
+		cud_safe(update, update_params)
 		return jsonify("Successfully updated")
 
 
@@ -6590,12 +7084,14 @@ def save_province():
 def save_v_mayor_corner():
 	p=json.loads(request.data)
 	if p['h_config_info_id1']==0 or p['h_config_info_id1']=="0":
-		insert="insert into tbl_config_info set vice_mayors_corner='"+str(p['vice_mayors_corner'])+"'"
-		cud(insert)
+		insert="""insert into tbl_config_info set vice_mayors_corner=%s"""
+		insert_params = [str(p['vice_mayors_corner'])]
+		cud_safe(insert, insert_params)
 		return jsonify("Successfully saved")
 	else:
-		update="update tbl_config_info set vice_mayors_corner='"+str(p['vice_mayors_corner'])+"' where config_info_id='"+str(p['h_config_info_id1'])+"'"
-		cud(update)
+		update="""update tbl_config_info set vice_mayors_corner=%s where config_info_id=%s"""
+		update_params = [str(p['vice_mayors_corner']), str(p['h_config_info_id1'])]
+		cud_safe(update, update_params)
 		return jsonify("Successfully updated")
 
 
@@ -6605,12 +7101,14 @@ def save_mission():
 	p=json.loads(request.data)
 	mission = p['mission'].replace("'","")
 	if p['h_config_info_id1']==0 or p['h_config_info_id1']=="0":
-		insert="insert into tbl_config_info set mission='"+str(mission)+"'"
-		cud(insert)
+		insert="""insert into tbl_config_info set mission=%s"""
+		insert_params = [str(mission)]
+		cud_safe(insert, insert_params)
 		return jsonify("Successfully saved")
 	else:
-		update="update tbl_config_info set mission='"+str(mission)+"' where config_info_id='"+str(p['h_config_info_id1'])+"'"
-		cud(update)
+		update="""update tbl_config_info set mission=%s where config_info_id=%s"""
+		update_params = [str(mission), str(p['h_config_info_id1'])]
+		cud_safe(update, update_params)
 		return jsonify("Successfully updated")
 
 
@@ -6619,12 +7117,14 @@ def save_mission():
 def save_vission():
 	p=json.loads(request.data)
 	if p['h_config_info_id1']==0 or p['h_config_info_id1']=="0":
-		insert="insert into tbl_config_info set vission='"+str(p['vission'])+"'"
-		cud(insert)
+		insert="""insert into tbl_config_info set vission=%s"""
+		insert_params = [str(p['vission'])]
+		cud_safe(insert, insert_params)
 		return jsonify("Successfully saved")
 	else:
-		update="update tbl_config_info set vission='"+str(p['vission'])+"' where config_info_id='"+str(p['h_config_info_id1'])+"'"
-		cud(update)
+		update="""update tbl_config_info set vission=%s where config_info_id=%s"""
+		update_params = [str(p['vission']), str(p['h_config_info_id1'])]
+		cud_safe(update, update_params)
 		return jsonify("Successfully updated")
 
 
@@ -6652,15 +7152,17 @@ def get_vice_photo():
 @login_required
 def get_file_resolution():
 	p=json.loads(request.data)
-	sel="select * from tbl_resolution_file where resolution_id='"+str(p['resolution_id'])+"'"
+	sel="""select * from tbl_resolution_file where resolution_id=%s"""
+	sel_params = [str(p['resolution_id'])]
 
 	sel="""
 		select * from tbl_resolution_file,(select filename minutes_filename, path minutes_path from tbl_resolution tr
 		LEFT JOIN tbl_minutes_resolution_path tmrp on tmrp.minutes_id=tr.minutes_id
-		WHERE  tr.resolution_id='"""+str(p['resolution_id'])+"""') nt
-		where resolution_id='"""+str(p['resolution_id'])+"""'
+		WHERE  tr.resolution_id=%s) nt
+		where resolution_id=%s
 	"""
-	rd=pyread(sel)
+	sel_params = [str(p['resolution_id']), str(p['resolution_id'])]
+	rd=pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 
@@ -6669,9 +7171,10 @@ def get_file_resolution():
 def get_tracking_legislative():
 	p=json.loads(request.data)
 	sel="""
-		select * from tbl_document_tracking_status where track_gen_id='"""+str(p['track_gen_id'])+"""'
+		select * from tbl_document_tracking_status where track_gen_id=%s
 	"""
-	rd=pyread(sel)
+	sel_params = [str(p['track_gen_id'])]
+	rd=pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 
@@ -6682,17 +7185,19 @@ def get_tracking_document_report():
 	sel="""
 		select * from tbl_document_tracking tdt 
 		left join tbl_committee tc on tc.committee_id=tdt.committee_id
-		where tracking_no='"""+str(p['tracking_no'])+"""'
+		where tracking_no=%s
 	"""
-	rd=pyread(sel)
+	sel_params = [str(p['tracking_no'])]
+	rd=pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 @query.route('/get_file_petition', methods=['POST','GET'])
 @login_required
 def get_file_petition():
 	p=json.loads(request.data)
-	sel="select * from tbl_petition_path where petition_id='"+str(p['petition_id'])+"'"
-	rd=pyread(sel)
+	sel="""select * from tbl_petition_path where petition_id=%s"""
+	sel_params = [str(p['petition_id'])]
+	rd=pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 
@@ -6700,40 +7205,45 @@ def get_file_petition():
 @login_required
 def get_file_executive():
 	p=json.loads(request.data)
-	sel="select * from tbl_executive_order_path where executive_order_id='"+str(p['executive_order_id'])+"'"
-	rd=pyread(sel)
+	sel="""select * from tbl_executive_order_path where executive_order_id=%s"""
+	sel_params = [str(p['executive_order_id'])]
+	rd=pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 @query.route('/get_file_memorandom', methods=['POST','GET'])
 @login_required
 def get_file_memorandom():
 	p=json.loads(request.data)
-	sel="select * from tbl_memorandom_path where memorandom_id='"+str(p['memorandom_id'])+"'"
-	rd=pyread(sel)
+	sel="""select * from tbl_memorandom_path where memorandom_id=%s"""
+	sel_params = [str(p['memorandom_id'])]
+	rd=pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 @query.route('/get_file_barangay_ordinance', methods=['POST','GET'])
 @login_required
 def get_file_barangay_ordinance():
 	p=json.loads(request.data)
-	sel="select * from tbl_barangay_ordinance_path where barangay_ordinance_id='"+str(p['barangay_ordinance_id'])+"'"
-	rd=pyread(sel)
+	sel="""select * from tbl_barangay_ordinance_path where barangay_ordinance_id=%s"""
+	sel_params = [str(p['barangay_ordinance_id'])]
+	rd=pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 @query.route('/get_file_barangay_resolution', methods=['POST','GET'])
 @login_required
 def get_file_barangay_resolution():
 	p=json.loads(request.data)
-	sel="select * from tbl_barangay_resolution_path where barangay_resolution_id='"+str(p['barangay_resolution_id'])+"'"
-	rd=pyread(sel)
+	sel="""select * from tbl_barangay_resolution_path where barangay_resolution_id=%s"""
+	sel_params = [str(p['barangay_resolution_id'])]
+	rd=pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 @query.route('/get_file_minutes', methods=['POST','GET'])
 @login_required
 def get_file_minutes():
 	p=json.loads(request.data)
-	sel="select * from tbl_minutes_path where minutes_id='"+str(p['minutes_id'])+"'"
-	rd=pyread(sel)
+	sel="""select * from tbl_minutes_path where minutes_id=%s"""
+	sel_params = [str(p['minutes_id'])]
+	rd=pyread_safe(sel, sel_params)
 	return jsonify(rd)	
 
 @query.route('/get_comm_reports', methods = ['POST','GET'])
@@ -6750,10 +7260,11 @@ def get_comm_reports():
 				tbl_ordinance_file_committee tofm
 				LEFT JOIN tbl_ordinance `to` ON tofm.ordinance_id = `to`.ordinance_id
 			WHERE
-				`to`.ordinance_title !="" and  tofm.committee_id = '"""+str(p['commitee_id'])+"""'
+				`to`.ordinance_title !="" and  tofm.committee_id = %s
 				GROUP BY tofm.ordinance_id 
 		"""
-		res_ordi = pyread(sel_ordi)
+		sel_ordi_params = [str(p['commitee_id'])]
+		res_ordi = pyread_safe(sel_ordi, sel_ordi_params)
 
 		# sel reso
 		sel_reso = """
@@ -6765,10 +7276,11 @@ def get_comm_reports():
 				tbl_resolution_file_committee tsfm
 				LEFT JOIN tbl_resolution ts ON tsfm.resolution_id = ts.resolution_id
 			WHERE
-				ts.resolution_title !='' and tsfm.committee_id = '"""+str(p['commitee_id'])+"""'
+				ts.resolution_title !='' and tsfm.committee_id = %s
 				GROUP BY tsfm.resolution_id 
 		"""
-		res_reso = pyread(sel_reso)
+		sel_reso_params = [str(p['commitee_id'])]
+		res_reso = pyread_safe(sel_reso, sel_reso_params)
 
 		sel_peti = """
 			SELECT
@@ -6779,10 +7291,11 @@ def get_comm_reports():
 				tbl_petition_path_committee tppc
 				LEFT JOIN tbl_petition tp ON tppc.petition_id = tp.petition_id
 			WHERE
-				tp.title != "" and  tppc.committee_id = '"""+str(p['commitee_id'])+"""'
+				tp.title != "" and  tppc.committee_id = %s
 				GROUP BY tppc.petition_id 
 		"""
-		res_peti = pyread(sel_peti)
+		sel_peti_params = [str(p['commitee_id'])]
+		res_peti = pyread_safe(sel_peti, sel_peti_params)
 
 		data = {"ordi":res_ordi,"reso":res_reso,"peti":res_peti}  
 		return jsonify(data)
@@ -6840,7 +7353,7 @@ def get_active_referrals():
 			left join tbl_session tb on tb.session_id=tbo.session_id
 			left join tbl_ordinance_author toa on toa.ordinance_id=tbo.ordinance_id
 			left join tbl_personal_info tpi on tpi.info_id=toa.author
-			where  tcr.committee_id='"""+str(p['committee_id'])+"""' and tbo.sp_id='"""+str(p['sp_id'])+"""' and tbo.session_id='"""+str(p['session_id'])+"""'
+			where  tcr.committee_id=%s and tbo.sp_id=%s and tbo.session_id=%s
 			group by tbo.ordinance_id
 
 			union
@@ -6852,9 +7365,10 @@ def get_active_referrals():
 			left join tbl_session tb on tb.session_id=tr.session_id
 			left join tbl_resolution_author toa on toa.resolution_id=tr.resolution_id
 			left join tbl_personal_info tpi on tpi.info_id=toa.author
-			where  tcr.committee_id='"""+str(p['committee_id'])+"""' and tr.sp_id='"""+str(p['sp_id'])+"""' and tr.session_id='"""+str(p['session_id'])+"""'
+			where  tcr.committee_id=%s and tr.sp_id=%s and tr.session_id=%s
 			group by tr.resolution_id
 		"""
+		sel_params = [str(p['committee_id']), str(p['sp_id']), str(p['session_id']), str(p['committee_id']), str(p['sp_id']), str(p['session_id'])]
 
 	if 'sp_id' in p and p['committee_id']!="0" and p['session_id']=="0":
 		sel="""
@@ -6865,7 +7379,7 @@ def get_active_referrals():
 			left join tbl_session tb on tb.session_id=tbo.session_id
 			left join tbl_ordinance_author toa on toa.ordinance_id=tbo.ordinance_id
 			left join tbl_personal_info tpi on tpi.info_id=toa.author
-			where  tcr.committee_id='"""+str(p['committee_id'])+"""' and tbo.sp_id='"""+str(p['sp_id'])+"""'
+			where  tcr.committee_id=%s and tbo.sp_id=%s
 			group by tbo.ordinance_id
 
 			union
@@ -6877,9 +7391,10 @@ def get_active_referrals():
 			left join tbl_session tb on tb.session_id=tr.session_id
 			left join tbl_resolution_author toa on toa.resolution_id=tr.resolution_id
 			left join tbl_personal_info tpi on tpi.info_id=toa.author
-			where  tcr.committee_id='"""+str(p['committee_id'])+"""' and tr.sp_id='"""+str(p['sp_id'])+"""'
+			where  tcr.committee_id=%s and tr.sp_id=%s
 			group by tr.resolution_id
 		"""
+		sel_params = [str(p['committee_id']), str(p['sp_id']), str(p['committee_id']), str(p['sp_id'])]
 
 	if 'sp_id' in p and p['committee_id']=="0" and p['session_id']=="0":
 		sel="""
@@ -6890,7 +7405,7 @@ def get_active_referrals():
 			left join tbl_session tb on tb.session_id=tbo.session_id
 			left join tbl_ordinance_author toa on toa.ordinance_id=tbo.ordinance_id
 			left join tbl_personal_info tpi on tpi.info_id=toa.author
-			where tbo.sp_id='"""+str(p['sp_id'])+"""'
+			where tbo.sp_id=%s
 			group by tbo.ordinance_id
 
 			union
@@ -6902,10 +7417,11 @@ def get_active_referrals():
 			left join tbl_session tb on tb.session_id=tr.session_id
 			left join tbl_resolution_author toa on toa.resolution_id=tr.resolution_id
 			left join tbl_personal_info tpi on tpi.info_id=toa.author
-			where  tcr.committee_id='"""+str(p['committee_id'])+"""'
+			where  tcr.committee_id=%s
 			group by tr.resolution_id
 		"""
-	rd = pyread(sel)
+		sel_params = [str(p['sp_id']), str(p['committee_id'])]
+	rd = pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 
@@ -6921,7 +7437,7 @@ def get_attendance_report_by():
 					left join tbl_session ts on ts.session_id=tsrc.session_id
 					left join tbl_personal_info tpi on tpi.info_id=tsrc.info_id
 					WHERE (tsrc.`status`=0 or tsrc.`status`=4) and 
-					(session_date BETWEEN '"""+str(p['month_from'])+"""' AND '"""+str(p['month_to'])+"""')
+					(session_date BETWEEN %s AND %s)
 					and tsrc.info_id=tsrc1.info_id
 			) present,
 			(select count(*) present
@@ -6929,7 +7445,7 @@ def get_attendance_report_by():
 					left join tbl_session ts on ts.session_id=tsrc.session_id
 					left join tbl_personal_info tpi on tpi.info_id=tsrc.info_id
 					WHERE tsrc.`status`=1 and 
-					(session_date BETWEEN '"""+str(p['month_from'])+"""' AND '"""+str(p['month_to'])+"""')
+					(session_date BETWEEN %s AND %s)
 					and tsrc.info_id=tsrc1.info_id
 			) absent,
 			(select count(*) present
@@ -6937,7 +7453,7 @@ def get_attendance_report_by():
 					left join tbl_session ts on ts.session_id=tsrc.session_id
 					left join tbl_personal_info tpi on tpi.info_id=tsrc.info_id
 					WHERE tsrc.`status`=2 and 
-					(session_date BETWEEN '"""+str(p['month_from'])+"""' AND '"""+str(p['month_to'])+"""')
+					(session_date BETWEEN %s AND %s)
 					and tsrc.info_id=tsrc1.info_id
 			) `leave`,
 			(select count(*) present
@@ -6945,7 +7461,7 @@ def get_attendance_report_by():
 					left join tbl_session ts on ts.session_id=tsrc.session_id
 					left join tbl_personal_info tpi on tpi.info_id=tsrc.info_id
 					WHERE tsrc.`status`=3 and 
-					(session_date BETWEEN '"""+str(p['month_from'])+"""' AND '"""+str(p['month_to'])+"""')
+					(session_date BETWEEN %s AND %s)
 					and tsrc.info_id=tsrc1.info_id
 			) `travel`,
 			" " remarks
@@ -6954,16 +7470,18 @@ def get_attendance_report_by():
 			left join tbl_personal_info tpi on tpi.info_id=tsrc1.info_id
 			inner join sp_member sm on sm.sp_id=ts.sp_number
 			inner join sp_councilor sc on sc.sp_member_id=sm.sp_member_id
-			where session_date BETWEEN '{}' AND '{}'
+			where session_date BETWEEN %s AND %s
 			group by tsrc1.info_id order by sc.sp_councilor
-		""".format(p['month_from'], p['month_to'])
-		rd = pyread(sel)
+		"""
+		sel_params = [str(p['month_from']), str(p['month_to']), str(p['month_from']), str(p['month_to']), str(p['month_from']), str(p['month_to']), str(p['month_from']), str(p['month_to']), p['month_from'], p['month_to']]
+		rd = pyread_safe(sel, sel_params)
 
 		count_query = """
 			SELECT COUNT(*) as session_count
 			FROM tbl_session
-			WHERE session_date BETWEEN '{}' AND '{}'
-		""".format(p['month_from'], p['month_to'])
+			WHERE session_date BETWEEN %s AND %s
+		"""
+		count_query_params = [p['month_from'], p['month_to']]
 	else:
 		sel = """
 			select session_type, concat(tpi.f_name, ' ', tpi.m_name, ' ', tpi.l_name) fullname,
@@ -6972,7 +7490,7 @@ def get_attendance_report_by():
 					left join tbl_session ts on ts.session_id=tsrc.session_id
 					left join tbl_personal_info tpi on tpi.info_id=tsrc.info_id
 					WHERE (tsrc.`status`=0 or tsrc.`status`=4)
-					and ts.session_id='"""+str(p['session_id'])+"""'
+					and ts.session_id=%s
 					and tsrc.info_id=tsrc1.info_id
 			) present,
 			(select count(*) present
@@ -6980,7 +7498,7 @@ def get_attendance_report_by():
 					left join tbl_session ts on ts.session_id=tsrc.session_id
 					left join tbl_personal_info tpi on tpi.info_id=tsrc.info_id
 					WHERE tsrc.`status`=1
-					and ts.session_id='"""+str(p['session_id'])+"""'
+					and ts.session_id=%s
 					and tsrc.info_id=tsrc1.info_id
 			) absent,
 			(select count(*) present
@@ -6988,7 +7506,7 @@ def get_attendance_report_by():
 					left join tbl_session ts on ts.session_id=tsrc.session_id
 					left join tbl_personal_info tpi on tpi.info_id=tsrc.info_id
 					WHERE tsrc.`status`=2
-					and ts.session_id='"""+str(p['session_id'])+"""'
+					and ts.session_id=%s
 					and tsrc.info_id=tsrc1.info_id
 			) `leave`,
 			(select count(*) present
@@ -6996,7 +7514,7 @@ def get_attendance_report_by():
 					left join tbl_session ts on ts.session_id=tsrc.session_id
 					left join tbl_personal_info tpi on tpi.info_id=tsrc.info_id
 					WHERE tsrc.`status`=3
-					and ts.session_id='"""+str(p['session_id'])+"""'
+					and ts.session_id=%s
 					and tsrc.info_id=tsrc1.info_id
 			) `travel`,
 			" " remarks
@@ -7005,18 +7523,20 @@ def get_attendance_report_by():
 			left join tbl_personal_info tpi on tpi.info_id=tsrc1.info_id
 			inner join sp_member sm on sm.sp_id=ts.sp_number
 			inner join sp_councilor sc on sc.sp_member_id=sm.sp_member_id
-			where ts.session_id='{}'
+			where ts.session_id=%s
 			group by tsrc1.info_id 
-		""".format(p['session_id'])
-		rd = pyread(sel)
+		"""
+		sel_params = [str(p['session_id']), str(p['session_id']), str(p['session_id']), str(p['session_id']), p['session_id']]
+		rd = pyread_safe(sel, sel_params)
 
 		count_query = """
 			SELECT COUNT(*) as session_count
 			FROM tbl_session
-			WHERE session_id = '{}'
-		""".format(p['session_id'])
+			WHERE session_id = %s
+		"""
+		count_query_params = [p['session_id']]
 
-	count_result = pyread(count_query)
+	count_result = pyread_safe(count_query, count_query_params)
 	count_session_table = count_result[0]['session_count'] if count_result else 0
 
 	return jsonify(rd, count_session_table)
@@ -7577,15 +8097,27 @@ def get_enacted_ordinance_by_period():
     if p['category'] == '0' and p['author'] == "0":
         flag = 1
 
+    params = []  # values for the %s placeholders, in the order they appear in the final query
+
     def date_clause():
-        return f"(date_enacted BETWEEN '{p['from']}' AND '{p['to']}')" if p['from'] and p['to'] else ""
+        if p['from'] and p['to']:
+            params.extend([p['from'], p['to']])
+            return "(date_enacted BETWEEN %s AND %s)"
+        return ""
 
     def category_clause():
-        return f"FIND_IN_SET('{p['category']}', category)" if p['category'] != '0' else ""
+        if p['category'] != '0':
+            params.append(str(p['category']))
+            return "FIND_IN_SET(%s, category)"
+        return ""
 
     def person_where_clause(role_col, alias):
+        author_cond = ""
+        if p['author'] != "0":
+            params.append(p['author'])
+            author_cond = f"{alias}.{role_col} = %s"
         conds = [
-            f"{alias}.{role_col} = '{p['author']}'" if p['author'] != "0" else "",
+            author_cond,
             category_clause(),
             "tor.status = 6",
             "ts.status = 'ACTIVE'",
@@ -7660,7 +8192,7 @@ def get_enacted_ordinance_by_period():
             GROUP BY ordinance_id
         """
 
-    rd = pyread(sel)
+    rd = pyread_safe(sel, params)
     return jsonify(rd)
 
 
@@ -7966,15 +8498,27 @@ def get_adopted_resolution_by_period():
     p['category'] = p.get('category', '0')
     flag = 1
 
+    params = []  # values for the %s placeholders, in the order they appear in the final query
+
     def date_clause():
-        return f"(date_enacted BETWEEN '{p['from']}' AND '{p['to']}')" if p['from'] and p['to'] else ""
+        if p['from'] and p['to']:
+            params.extend([p['from'], p['to']])
+            return "(date_enacted BETWEEN %s AND %s)"
+        return ""
 
     def category_clause():
-        return f"FIND_IN_SET('{p['category']}', category)" if p['category'] != '0' else ""
+        if p['category'] != '0':
+            params.append(str(p['category']))
+            return "FIND_IN_SET(%s, category)"
+        return ""
 
     def person_where_clause(role_col, alias):
+        author_cond = ""
+        if p['author'] != "0":
+            params.append(p['author'])
+            author_cond = f"{alias}.{role_col} = %s"
         conds = [
-            f"{alias}.{role_col} = '{p['author']}'" if p['author'] != "0" else "",
+            author_cond,
             category_clause(),
             "tr.status = 6",
             "ts.status = 'ACTIVE'",
@@ -8053,7 +8597,7 @@ def get_adopted_resolution_by_period():
             GROUP BY resolution_id, resolution_number, title, date_enacted, path
         """
 
-    rd = pyread(sel)
+    rd = pyread_safe(sel, params)
     return jsonify(rd)
 
 
@@ -8085,8 +8629,9 @@ def get_category_ordinance():
 def get_councilor_ordinance():
 	try:
 		p = json.loads(request.data)
-		sel = "SELECT * FROM tbl_ordinance `to` LEFT JOIN tbl_sp ts ON `to`.sp_id = ts.sp_id WHERE ts.`status` = 'Active' and `to`.author = '"+p['name']+"' and `to`.status = 6"
-		res = pyread(sel)
+		sel = """SELECT * FROM tbl_ordinance `to` LEFT JOIN tbl_sp ts ON `to`.sp_id = ts.sp_id WHERE ts.`status` = 'Active' and `to`.author = %s and `to`.status = 6"""
+		sel_params = [p['name']]
+		res = pyread_safe(sel, sel_params)
 		return jsonify(res)
 	except Exception as e:
 		prnt_R(e)
@@ -8099,8 +8644,9 @@ def get_councilor_ordinance():
 def get_councilor_reso():
 	try:
 		p = json.loads(request.data)
-		sel = "select * from tbl_resolution tr LEFT JOIN tbl_sp ts ON tr.sp_id = ts.sp_id WHERE ts.`status` = 'Active' and tr.author = '"+p['name']+"' and tr.status = 6"
-		res = pyread(sel)
+		sel = """select * from tbl_resolution tr LEFT JOIN tbl_sp ts ON tr.sp_id = ts.sp_id WHERE ts.`status` = 'Active' and tr.author = %s and tr.status = 6"""
+		sel_params = [p['name']]
+		res = pyread_safe(sel, sel_params)
 		return jsonify(res)
 	except Exception as e:
 		prnt_R(e)
@@ -8112,8 +8658,9 @@ def get_councilor_reso():
 def get_councilor_petition():
 	try:
 		p = json.loads(request.data)
-		sel = "select * from tbl_petition where source_of_document = '"+p['name']+"' and action_taken = 1"
-		res = pyread(sel)
+		sel = """select * from tbl_petition where source_of_document = %s and action_taken = 1"""
+		sel_params = [p['name']]
+		res = pyread_safe(sel, sel_params)
 		return jsonify(res)
 	except Exception as e:
 		prnt_R(e)
@@ -8136,12 +8683,14 @@ def save_barangay():
 	try:
 		p = json.loads(request.data)
 		if p['brgy_id']!=0:
-			upt = "update tbl_barangay set barangay = '"+str(p['brgy'])+"' where brgy_id = '"+str(p['brgy_id'])+"'"
-			cud(upt)
+			upt = """update tbl_barangay set barangay = %s where brgy_id = %s"""
+			upt_params = [str(p['brgy']), str(p['brgy_id'])]
+			cud_safe(upt, upt_params)
 			msg = "Updated Succesfuly"
 		else:
-			ins = "insert into tbl_barangay set barangay = '"+str(p['brgy'])+"'"
-			cud(ins)
+			ins = """insert into tbl_barangay set barangay = %s"""
+			ins_params = [str(p['brgy'])]
+			cud_safe(ins, ins_params)
 			msg = "Inserted Succesfuly"
 
 		return jsonify(msg)
@@ -8155,8 +8704,9 @@ def save_barangay():
 def delete_brgy():
 	try:
 		p = json.loads(request.data)
-		del_q = "delete from tbl_barangay where brgy_id = '"+str(p['brgy_id'])+"'"
-		cud(del_q)
+		del_q = """delete from tbl_barangay where brgy_id = %s"""
+		del_q_params = [str(p['brgy_id'])]
+		cud_safe(del_q, del_q_params)
 		return jsonify("deleted")
 	except Exception as e:
 		prnt_R(e)
@@ -8167,13 +8717,14 @@ def delete_brgy():
 def get_barangay_ordinance_report():
 	p=json.loads(request.data)
 	sel="""
-		select *, date_format(date_submitted,'%a %M, %d %Y') dates 
+		select *, date_format(date_submitted,'%%a %%M, %%d %%Y') dates 
 		from tbl_barangay_ordinance tbo
 		left join tbl_barangay_ordinance_path tbop on tbop.barangay_ordinance_id=tbo.barangay_ordinance_id
 		left join tbl_barangay tb on tb.brgy_id=tbo.brgy_id
-		where tbo.brgy_id='"""+str(p['brgy_id'])+"""'
+		where tbo.brgy_id=%s
 	"""
-	rd=pyread(sel)
+	sel_params = [str(p['brgy_id'])]
+	rd=pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 @query.route('/get_barangay_resolution_report', methods=['GET', 'POST'])
@@ -8181,13 +8732,14 @@ def get_barangay_ordinance_report():
 def get_barangay_resolution_report():
 	p=json.loads(request.data)
 	sel="""
-		select *, date_format(date_submitted,'%a %M, %d %Y') dates 
+		select *, date_format(date_submitted,'%%a %%M, %%d %%Y') dates 
 		from tbl_barangay_resolution tbr
 		left join tbl_barangay_resolution_path tbrp on tbrp.barangay_resolution_id=tbr.barangay_resolution_id
 		left join tbl_barangay tb on tb.brgy_id=tbr.brgy_id
-		where tbr.brgy_id='"""+str(p['brgy_id'])+"""'
+		where tbr.brgy_id=%s
 	"""
-	rd=pyread(sel)
+	sel_params = [str(p['brgy_id'])]
+	rd=pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 
@@ -8224,10 +8776,11 @@ def send_image():
 			configure_uploads(app, photos)
 			filer = photos.save(scan_image)
 
-		file_ = str(file.filename).replace("'","''")
+		file_ = str(file.filename)
 		path=location + file_
-		insert="replace into tbl_bg_image set bg_id=1, path='"+str(path)+"', color_title='"+str(p['color'])+"'"
-		cud(insert)
+		insert="""replace into tbl_bg_image set bg_id=1, path=%s, color_title=%s"""
+		insert_params = [str(path), str(p['color'])]
+		cud_safe(insert, insert_params)
 
 		os.chdir(cwd) 
 		return jsonify("Successfully Saved")
@@ -8237,8 +8790,9 @@ def send_image():
 @login_required
 def update_color():
 	p=json.loads(request.data)
-	update="update tbl_bg_image set color_title='"+str(p['color_title'])+"' where bg_id=1"
-	cud(update)
+	update="""update tbl_bg_image set color_title=%s where bg_id=1"""
+	update_params = [str(p['color_title'])]
+	cud_safe(update, update_params)
 	select="select * from tbl_bg_image where bg_id=1"
 	rd=pyread(select)
 	return jsonify(rd)
@@ -8248,56 +8802,63 @@ def update_color():
 @login_required
 def get_author_resolutions():
 	p=json.loads(request.data)
-	sel="select * from tbl_resolution_author where resolution_id='"+str(p['resolution_id'])+"'"
-	rd=pyread(sel)
+	sel="""select * from tbl_resolution_author where resolution_id=%s"""
+	sel_params = [str(p['resolution_id'])]
+	rd=pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 @query.route('/get_co_author_resolutions', methods=['GET', 'POST'])
 @login_required
 def get_co_author_resolutions():
 	p=json.loads(request.data)
-	sel="select * from tbl_resolution_co_author where resolution_id='"+str(p['resolution_id'])+"'"
-	rd=pyread(sel)
+	sel="""select * from tbl_resolution_co_author where resolution_id=%s"""
+	sel_params = [str(p['resolution_id'])]
+	rd=pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 @query.route('/get_sponsor_resolutions', methods=['GET', 'POST'])
 @login_required
 def get_sponsor_resolutions():
 	p=json.loads(request.data)
-	sel="select * from tbl_resolution_sponsor where resolution_id='"+str(p['resolution_id'])+"'"
-	rd=pyread(sel)
+	sel="""select * from tbl_resolution_sponsor where resolution_id=%s"""
+	sel_params = [str(p['resolution_id'])]
+	rd=pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 @query.route('/get_cosponsor_resolutions', methods=['GET', 'POST'])
 @login_required
 def get_cosponsor_resolutions():
 	p=json.loads(request.data)
-	sel="select * from tbl_resolution_cosponsor where resolution_id='"+str(p['resolution_id'])+"'"
-	rd=pyread(sel)
+	sel="""select * from tbl_resolution_cosponsor where resolution_id=%s"""
+	sel_params = [str(p['resolution_id'])]
+	rd=pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 @query.route('/get_author_ordinances', methods=['GET', 'POST'])
 @login_required
 def get_author_ordinances():
 	p=json.loads(request.data)
-	sel="select * from tbl_ordinance_author where ordinance_id='"+str(p['ordinance_id'])+"'"
-	rd=pyread(sel)
+	sel="""select * from tbl_ordinance_author where ordinance_id=%s"""
+	sel_params = [str(p['ordinance_id'])]
+	rd=pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 @query.route('/get_co_author_ordinance', methods=['GET', 'POST'])
 @login_required
 def get_co_author_ordinance():
 	p=json.loads(request.data)
-	sel="select * from tbl_ordinance_co_author where ordinance_id='"+str(p['ordinance_id'])+"'"
-	rd=pyread(sel)
+	sel="""select * from tbl_ordinance_co_author where ordinance_id=%s"""
+	sel_params = [str(p['ordinance_id'])]
+	rd=pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 @query.route('/get_sponsor_ordinance', methods=['GET', 'POST'])
 @login_required
 def get_sponsor_ordinance():
 	p=json.loads(request.data)
-	sel="select * from tbl_ordinance_sponsor where ordinance_id='"+str(p['ordinance_id'])+"'"
-	rd=pyread(sel)
+	sel="""select * from tbl_ordinance_sponsor where ordinance_id=%s"""
+	sel_params = [str(p['ordinance_id'])]
+	rd=pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 
@@ -8309,9 +8870,10 @@ def get_committee_info():
 		select *, concat(tpi.f_name,' ',tpi.m_name,' ',tpi.l_name) co_chairmans 
 		from tbl_committee tc
 		left join tbl_personal_info tpi on tpi.info_id=tc.co_chairman
-		where committee_id='"""+str(p['committee_id'])+"""'
+		where committee_id=%s
 	"""
-	rd=pyread(sel)
+	sel_params = [str(p['committee_id'])]
+	rd=pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 
@@ -8323,9 +8885,10 @@ def get_committee_member_info():
 		select *,concat(tpi.f_name,' ',tpi.m_name,' ',tpi.l_name) fullname 
 		from tbl_committee_members tcm
 		left join tbl_personal_info tpi on tpi.info_id=tcm.committee_members
-		where committee_id='"""+str(p['committee_id'])+"""'
+		where committee_id=%s
 	"""
-	rd=pyread(sel)
+	sel_params = [str(p['committee_id'])]
+	rd=pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 
@@ -8366,7 +8929,7 @@ def save_background():
 		n_path.resolve()
 
 		if file and allowed_file(file.filename):
-			filename = str(custom_secure_filename(file.filename)).replace("'","''")
+			filename = str(custom_secure_filename(file.filename))
 			if not os.path.exists(n_path):
 				os.mkdir(n_path)
 				app.config['UPLOAD_FOLDER']=n_path
@@ -8379,8 +8942,9 @@ def save_background():
 			location1.replace("//", "\\\\");
 			location=location1+"/"+filename
 			path_location=location.replace("/", "\\\\");
-			insert="insert into tbl_gallery set path='"+str(path_location)+"'"
-			cud(insert)
+			insert="""insert into tbl_gallery set path=%s"""
+			insert_params = [str(path_location)]
+			cud_safe(insert, insert_params)
 
 	return jsonify("Succesfuly Saved")
 	
@@ -8399,8 +8963,9 @@ def get_gallery_carousel():
 @login_required
 def del_gallery_carousel():
 	p=json.loads(request.data)
-	delete="delete from tbl_gallery where id='"+str(p['id'])+"'"
-	cud(delete)
+	delete="""delete from tbl_gallery where id=%s"""
+	delete_params = [str(p['id'])]
+	cud_safe(delete, delete_params)
 	return jsonify("Succesfuly Deleted")
 
 @query.route('/get_login_data', methods = ['POST','GET'])
@@ -8459,9 +9024,10 @@ def get_document_tracking_not_approved():
 def get_document_tracking_refferal():
 	p = json.loads(request.data)
 	sel="""
-		select * from tbl_document_tracking_refferal where track_gen_id='"""+str(p['track_gen_id'])+"""'
+		select * from tbl_document_tracking_refferal where track_gen_id=%s
 	"""
-	rd=pyread(sel)
+	sel_params = [str(p['track_gen_id'])]
+	rd=pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 
@@ -8489,8 +9055,9 @@ def get_rules_and_procedure():
 @login_required
 def save_album_title():
 	p=json.loads(request.data)
-	insert="insert into tbl_album_gallery set album_name='"+str(p['album'])+"', date_gen=now()"
-	cud(insert)
+	insert="""insert into tbl_album_gallery set album_name=%s, date_gen=now()"""
+	insert_params = [str(p['album'])]
+	cud_safe(insert, insert_params)
 	return jsonify("Successfully Saved")
 
 
@@ -8512,9 +9079,10 @@ def get_album_title():
 def del_gallery_album():
 	p=json.loads(request.data)
 	delete="""
-		delete from tbl_album_gallery where gallery_id='"""+str(p['id'])+"""'
+		delete from tbl_album_gallery where gallery_id=%s
 	"""
-	cud(delete)
+	delete_params = [str(p['id'])]
+	cud_safe(delete, delete_params)
 	return jsonify("Successfully Deleted")
 
 
@@ -8525,9 +9093,10 @@ def get_gallery_images():
 	sel="""
 		select *, tagp.id pic_id from tbl_album_gallery tag
 		left join tbl_album_gallery_photo tagp on tag.gallery_id=tagp.gallery_id
-		where tag.gallery_id='"""+str(p['gallery_id'])+"""'
+		where tag.gallery_id=%s
 	"""
-	rd=pyread(sel)
+	sel_params = [str(p['gallery_id'])]
+	rd=pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 
@@ -8542,7 +9111,7 @@ def save_album_images():
 		n_path.resolve()
 
 		if file and allowed_file(file.filename):
-			filename = str(custom_secure_filename(file.filename)).replace("'","''")
+			filename = str(custom_secure_filename(file.filename))
 			if not os.path.exists(n_path):
 				os.mkdir(n_path)
 				app.config['UPLOAD_FOLDER']=n_path
@@ -8555,9 +9124,10 @@ def save_album_images():
 			location1.replace("//", "\\\\");
 			location=location1+"/"+filename
 			path_location=location.replace("/", "\\\\");
-			file_ = str(file.filename).replace("'","''")
-			insert2="insert into tbl_album_gallery_photo set filename='"+str(file_)+"', path='"+str(path_location)+"', gallery_id='"+str(p['gallery_id'])+"', date=now()"
-			cud(insert2)
+			file_ = str(file.filename)
+			insert2="""insert into tbl_album_gallery_photo set filename=%s, path=%s, gallery_id=%s, date=now()"""
+			insert2_params = [str(file_), str(path_location), str(p['gallery_id'])]
+			cud_safe(insert2, insert2_params)
 
 	return jsonify("Succesfuly Saved")
 
@@ -8576,7 +9146,7 @@ def save_citezen_charter():
 		n_path.resolve()
 
 		if file and allowed_file(file.filename):
-			filename = str(custom_secure_filename(file.filename)).replace("'","''")
+			filename = str(custom_secure_filename(file.filename))
 			if not os.path.exists(n_path):
 				os.mkdir(n_path)
 				app.config['UPLOAD_FOLDER']=n_path
@@ -8590,8 +9160,9 @@ def save_citezen_charter():
 			location=location1+"/"+filename
 			path_location=location.replace("/", "\\\\");
 			split_name = str(file.filename).split(".")
-			insert2="insert into tbl_citezen_charter_path set filename='"+str(split_name[0])+"', date_gen=now() ,path='"+str(path_location)+"'"
-			cud(insert2)
+			insert2="""insert into tbl_citezen_charter_path set filename=%s, date_gen=now() ,path=%s"""
+			insert2_params = [str(split_name[0]), str(path_location)]
+			cud_safe(insert2, insert2_params)
 	return jsonify("Succesfuly Saved")
 
 
@@ -8600,8 +9171,9 @@ def save_citezen_charter():
 @login_required
 def del_citezen_charter_file():
 	p=json.loads(request.data)
-	delete="delete from tbl_citezen_charter_path where id='"+str(p['id'])+"'"
-	cud(delete)
+	delete="""delete from tbl_citezen_charter_path where id=%s"""
+	delete_params = [str(p['id'])]
+	cud_safe(delete, delete_params)
 	return jsonify("Succesfuly Deleted")
 
 
@@ -8612,15 +9184,17 @@ def save_rules_and_procedure():
 	p=json.loads(f['Serialized'])
 	if p['id']=="0":
 		insert="""
-			insert into tbl_rules_and_procedure set title='"""+str(p['title'])+"""', rules='"""+str(f['rules'])+"""', date_gen=now()
+			insert into tbl_rules_and_procedure set title=%s, rules=%s, date_gen=now()
 		"""
-		cud(insert)
+		insert_params = [str(p['title']), str(f['rules'])]
+		cud_safe(insert, insert_params)
 		return jsonify("Succesfuly Saved")
 	else:
 		update="""
-			update tbl_rules_and_procedure set title='"""+str(p['title'])+"""', rules='"""+str(f['rules'])+"""', date_gen=now() where id='"""+str(p['id'])+"""'
+			update tbl_rules_and_procedure set title=%s, rules=%s, date_gen=now() where id=%s
 		"""
-		cud(update)
+		update_params = [str(p['title']), str(f['rules']), str(p['id'])]
+		cud_safe(update, update_params)
 		return jsonify("Succesfuly Updated")
 
 
@@ -8629,9 +9203,10 @@ def save_rules_and_procedure():
 def del_rules_and_procedure_file():
 	p=json.loads(request.data)
 	delete="""
-		delete from tbl_rules_and_procedure where id='"""+str(p['id'])+"""'
+		delete from tbl_rules_and_procedure where id=%s
 	"""
-	cud(delete)
+	delete_params = [str(p['id'])]
+	cud_safe(delete, delete_params)
 	return jsonify("Succesfuly Deleted")
 
 
@@ -8661,7 +9236,7 @@ def save_download_center():
 			n_path.resolve()
 
 			if file and allowed_file(file.filename):
-				filename = str(custom_secure_filename(file.filename)).replace("'","''")
+				filename = str(custom_secure_filename(file.filename))
 				if not os.path.exists(n_path):
 					os.mkdir(n_path)
 					app.config['UPLOAD_FOLDER']=n_path
@@ -8676,8 +9251,9 @@ def save_download_center():
 				path_location=location.replace("/", "\\\\");
 				
 				split_name = str(file.filename).split(".")
-				insert2="insert into tbl_download_center_path set filename='"+str(split_name[0])+"', description='"+str(p['title'])+"' ,date_gen=now() ,path='"+str(path_location)+"'"
-				cud(insert2)
+				insert2="""insert into tbl_download_center_path set filename=%s, description=%s ,date_gen=now() ,path=%s"""
+				insert2_params = [str(split_name[0]), str(p['title']), str(path_location)]
+				cud_safe(insert2, insert2_params)
 	else:
 		for filename_array in request.files:
 			file=request.files[filename_array]
@@ -8688,7 +9264,7 @@ def save_download_center():
 			n_path.resolve()
 
 			if file and allowed_file(file.filename):
-				filename = str(custom_secure_filename(file.filename)).replace("'","''")
+				filename = str(custom_secure_filename(file.filename))
 				if not os.path.exists(n_path):
 					os.mkdir(n_path)
 					app.config['UPLOAD_FOLDER']=n_path
@@ -8703,8 +9279,9 @@ def save_download_center():
 				path_location=location.replace("/", "\\\\");
 				
 				split_name = str(file.filename).split(".")
-				update="update tbl_download_center_path set filename='"+str(split_name[0])+"', description='"+str(p['title'])+"' ,date_gen=now() ,path='"+str(path_location)+"' where id='"+str(p['id'])+"'"
-				cud(update)
+				update="""update tbl_download_center_path set filename=%s, description=%s ,date_gen=now() ,path=%s where id=%s"""
+				update_params = [str(split_name[0]), str(p['title']), str(path_location), str(p['id'])]
+				cud_safe(update, update_params)
 
 	return jsonify("Succesfuly Saved")
 
@@ -8714,9 +9291,10 @@ def save_download_center():
 def del_download_center_file():
 	p=json.loads(request.data)
 	delete="""
-		delete from tbl_download_center_path where id='"""+str(p['id'])+"""'
+		delete from tbl_download_center_path where id=%s
 	"""
-	cud(delete)
+	delete_params = [str(p['id'])]
+	cud_safe(delete, delete_params)
 	return jsonify("Succesfuly Deleted")
 
 
@@ -8726,9 +9304,10 @@ def del_download_center_file():
 def del_pic():
 	p=json.loads(request.data)
 	delete="""
-		delete from tbl_album_gallery_photo where id='"""+str(p['id'])+"""'
+		delete from tbl_album_gallery_photo where id=%s
 	"""
-	cud(delete)
+	delete_params = [str(p['id'])]
+	cud_safe(delete, delete_params)
 	return jsonify("Succesfuly Deleted")
 
 
@@ -8777,8 +9356,9 @@ def get_inventory_ordinances():
 @login_required
 def changeSystemType():
 	p=json.loads(request.data)
-	upd="update tbl_config_info set type ='"+str(p['checktype'])+"', show_council_data='"+str(p['show_council_data'])+"', session_layout='"+str(p['session_layout'])+"' "
-	cud(upd)
+	upd="""update tbl_config_info set type =%s, show_council_data=%s, session_layout=%s """
+	upd_params = [str(p['checktype']), str(p['show_council_data']), str(p['session_layout'])]
+	cud_safe(upd, upd_params)
 	return jsonify("Succesfuly Updated")
 
 
@@ -8786,10 +9366,12 @@ def changeSystemType():
 @login_required
 def update_activeSp():
 	p=json.loads(request.data)
-	upd="update tbl_sp set status='INACTIVE' where sp_id!='"+str(p['sp_id'])+"'"
-	cud(upd)
-	upd2="update tbl_sp set status='ACTIVE' where sp_id='"+str(p['sp_id'])+"'"
-	cud(upd2)
+	upd="""update tbl_sp set status='INACTIVE' where sp_id!=%s"""
+	upd_params = [str(p['sp_id'])]
+	cud_safe(upd, upd_params)
+	upd2="""update tbl_sp set status='ACTIVE' where sp_id=%s"""
+	upd2_params = [str(p['sp_id'])]
+	cud_safe(upd2, upd2_params)
 	return jsonify("Succesfuly Updated")
 
 
@@ -8830,73 +9412,86 @@ def count_documents():
 def save_role():
 	p=json.loads(request.data)
 
-	update ="update tbl_login set role='"+str(p['role_access'])+"' where login_id='"+str(p['login_id'])+"'"
-	cud(update)
+	update ="""update tbl_login set role=%s where login_id=%s"""
+	update_params = [str(p['role_access']), str(p['login_id'])]
+	cud_safe(update, update_params)
 
-	delete = "delete from tbl_login_access where login_id='"+str(p['login_id'])+"'"
-	cud(delete)
+	delete = """delete from tbl_login_access where login_id=%s"""
+	delete_params = [str(p['login_id'])]
+	cud_safe(delete, delete_params)
 
 	if 'session' in p:
-		insert ="insert into tbl_login_access set routes='/sessions', login_id='"+str(p['login_id'])+"', `read`='"+str(p.get('session_read', 'off'))+"', `write`='"+str(p.get('session_write', 'off'))+"'"
-		cud(insert)
+		insert ="""insert into tbl_login_access set routes='/sessions', login_id=%s, `read`=%s, `write`=%s"""
+		insert_params = [str(p['login_id']), str(p.get('session_read', 'off')), str(p.get('session_write', 'off'))]
+		cud_safe(insert, insert_params)
 
 	if 'ordinance' in p:
 		arr = ['/view_ordinance', '/proposed_ordinance', '/2nd_ordinance', '/3rd_ordinance', '/3rd_ordinance_exemption', '/for_approval_ordinance',
 		 '/approval_ordinance', '/veto_ordinance', '/archive_ordinance']
 
 		for i in arr:
-			insert ="insert into tbl_login_access set routes='"+str(i)+"', login_id='"+str(p['login_id'])+"',  `read`='"+str(p.get('ordinance_read', 'off'))+"', `write`='"+str(p.get('ordinance_write', 'off'))+"'"
-			cud(insert)
+			insert ="""insert into tbl_login_access set routes=%s, login_id=%s,  `read`=%s, `write`=%s"""
+			insert_params = [str(i), str(p['login_id']), str(p.get('ordinance_read', 'off')), str(p.get('ordinance_write', 'off'))]
+			cud_safe(insert, insert_params)
 
 	if 'resolution' in p:
 		arr = ['/resolution', '/proposed_resolution', '/2nd_resolution', '/3rd_resolution', '/3rd_resolution_exemption', '/for_approval_resolution',
 		 '/approval_resolution', '/veto_resolution', '/archive_resolution']
 		for i in arr:
-			insert ="insert into tbl_login_access set routes='"+str(i)+"', login_id='"+str(p['login_id'])+"' , `read`='"+str(p.get('resolution_read', 'off'))+"', `write`='"+str(p.get('resolution_write', 'off'))+"'"
-			cud(insert)
+			insert ="""insert into tbl_login_access set routes=%s, login_id=%s , `read`=%s, `write`=%s"""
+			insert_params = [str(i), str(p['login_id']), str(p.get('resolution_read', 'off')), str(p.get('resolution_write', 'off'))]
+			cud_safe(insert, insert_params)
 
 	# if 'petition' in p:
 	# 	insert ="insert into tbl_login_access set routes='/petition', login_id='"+str(p['login_id'])+"' , `read`='"+str(p.get('session_read', 'off'))+"', `write`='"+str(p.get('session_write', 'off'))+"'"
 	# 	cud(insert)
 
 	if 'minutes' in p:
-		insert ="insert into tbl_login_access set routes='/minutes', login_id='"+str(p['login_id'])+"' , `read`='"+str(p.get('minutes_read', 'off'))+"', `write`='"+str(p.get('minutes_write', 'off'))+"'"
-		cud(insert)
+		insert ="""insert into tbl_login_access set routes='/minutes', login_id=%s , `read`=%s, `write`=%s"""
+		insert_params = [str(p['login_id']), str(p.get('minutes_read', 'off')), str(p.get('minutes_write', 'off'))]
+		cud_safe(insert, insert_params)
 
 	if 'document_tracking' in p:
-		insert ="insert into tbl_login_access set routes='/document_tracking', login_id='"+str(p['login_id'])+"', `read`='"+str(p.get('document_tracking_read', 'off'))+"', `write`='"+str(p.get('document_tracking_write', 'off'))+"'"
-		cud(insert)
+		insert ="""insert into tbl_login_access set routes='/document_tracking', login_id=%s, `read`=%s, `write`=%s"""
+		insert_params = [str(p['login_id']), str(p.get('document_tracking_read', 'off')), str(p.get('document_tracking_write', 'off'))]
+		cud_safe(insert, insert_params)
 
 	if 'sp_budget' in p:
 		arr = ['/sp_budget', '/capital_oultay', '/sp_member_deduction']
 
 		for i in arr:
-			insert ="insert into tbl_login_access set routes='"+str(i)+"', login_id='"+str(p['login_id'])+"' , `read`='"+str(p.get('sp_budget_read', 'off'))+"', `write`='"+str(p.get('sp_budget_write', 'off'))+"'"
-			cud(insert)
+			insert ="""insert into tbl_login_access set routes=%s, login_id=%s , `read`=%s, `write`=%s"""
+			insert_params = [str(i), str(p['login_id']), str(p.get('sp_budget_read', 'off')), str(p.get('sp_budget_write', 'off'))]
+			cud_safe(insert, insert_params)
 
 	if 'configuration' in p:
 		arr = ['/sangunian', '/accounts', '/announcement', '/announcement', '/governance_classification', '/category', '/user',
 		'/gmail_account', '/info', '/barangay', '/background']
 
 		for i in arr:
-			insert ="insert into tbl_login_access set routes='"+str(i)+"', login_id='"+str(p['login_id'])+"' , `read`='"+str(p.get('configuration_read', 'off'))+"', `write`='"+str(p.get('configuration_write', 'off'))+"'"
-			cud(insert)
+			insert ="""insert into tbl_login_access set routes=%s, login_id=%s , `read`=%s, `write`=%s"""
+			insert_params = [str(i), str(p['login_id']), str(p.get('configuration_read', 'off')), str(p.get('configuration_write', 'off'))]
+			cud_safe(insert, insert_params)
 
 	if 'committee' in p:
-		insert ="insert into tbl_login_access set routes='/committee', login_id='"+str(p['login_id'])+"' , `read`='"+str(p.get('committee_write', 'off'))+"', `write`='"+str(p.get('committee_read', 'off'))+"'"
-		cud(insert)
+		insert ="""insert into tbl_login_access set routes='/committee', login_id=%s , `read`=%s, `write`=%s"""
+		insert_params = [str(p['login_id']), str(p.get('committee_write', 'off')), str(p.get('committee_read', 'off'))]
+		cud_safe(insert, insert_params)
 
 	if 'gallery_albums' in p:
-		insert ="insert into tbl_login_access set routes='/gallery_albums', login_id='"+str(p['login_id'])+"' , `read`='"+str(p.get('gallery_read', 'off'))+"', `write`='"+str(p.get('gallery_write', 'off'))+"'"
-		cud(insert)
+		insert ="""insert into tbl_login_access set routes='/gallery_albums', login_id=%s , `read`=%s, `write`=%s"""
+		insert_params = [str(p['login_id']), str(p.get('gallery_read', 'off')), str(p.get('gallery_write', 'off'))]
+		cud_safe(insert, insert_params)
 	
 	if 'executive_order' in p:
-		insert ="insert into tbl_login_access set routes='/executive_order', login_id='"+str(p['login_id'])+"' , `read`='"+str(p.get('executive_order_read', 'off'))+"', `write`='"+str(p.get('executive_order_write', 'off'))+"'"
-		cud(insert)
+		insert ="""insert into tbl_login_access set routes='/executive_order', login_id=%s , `read`=%s, `write`=%s"""
+		insert_params = [str(p['login_id']), str(p.get('executive_order_read', 'off')), str(p.get('executive_order_write', 'off'))]
+		cud_safe(insert, insert_params)
 
 	if 'memorandom' in p:
-		insert ="insert into tbl_login_access set routes='/memorandom', login_id='"+str(p['login_id'])+"' , `read`='"+str(p.get('memorandum_read', 'off'))+"', `write`='"+str(p.get('memorandum_write', 'off'))+"'"
-		cud(insert)
+		insert ="""insert into tbl_login_access set routes='/memorandom', login_id=%s , `read`=%s, `write`=%s"""
+		insert_params = [str(p['login_id']), str(p.get('memorandum_read', 'off')), str(p.get('memorandum_write', 'off'))]
+		cud_safe(insert, insert_params)
 
 	# if 'barangay_ordinance' in p:
 	# 	insert ="insert into tbl_login_access set routes='/barangay_ordinance', login_id='"+str(p['login_id'])+"' , `read`='"+str(p.get('session_read', 'off'))+"', `write`='"+str(p.get('session_write', 'off'))+"'"
@@ -8907,30 +9502,35 @@ def save_role():
 	# 	cud(insert)
 
 	if 'documents_refferals' in p:
-		insert ="insert into tbl_login_access set routes='/documents_refferals', login_id='"+str(p['login_id'])+"' , `read`='"+str(p.get('documents_refferals_read', 'off'))+"', `write`='"+str(p.get('documents_refferals_write', 'off'))+"'"
-		cud(insert)
+		insert ="""insert into tbl_login_access set routes='/documents_refferals', login_id=%s , `read`=%s, `write`=%s"""
+		insert_params = [str(p['login_id']), str(p.get('documents_refferals_read', 'off')), str(p.get('documents_refferals_write', 'off'))]
+		cud_safe(insert, insert_params)
 
 	if 'reports' in p:
-		insert ="insert into tbl_login_access set routes='/reports', login_id='"+str(p['login_id'])+"'"
-		cud(insert)
+		insert ="""insert into tbl_login_access set routes='/reports', login_id=%s"""
+		insert_params = [str(p['login_id'])]
+		cud_safe(insert, insert_params)
 
 	# if 'profiling_ordinance' in p:
 	# 	insert ="insert into tbl_login_access set routes='/profiling_ordinance', login_id='"+str(p['login_id'])+"' , `read`='"+str(p.get('session_read', 'off'))+"', `write`='"+str(p.get('session_write', 'off'))+"'"
 	# 	cud(insert)
 	
 	if 'citezen_charter' in p:
-		insert ="insert into tbl_login_access set routes='/citezen_charter', login_id='"+str(p['login_id'])+"' , `read`='"+str(p.get('citezen_charter_read', 'off'))+"', `write`='"+str(p.get('citezen_charter_write', 'off'))+"'"
-		cud(insert)
+		insert ="""insert into tbl_login_access set routes='/citezen_charter', login_id=%s , `read`=%s, `write`=%s"""
+		insert_params = [str(p['login_id']), str(p.get('citezen_charter_read', 'off')), str(p.get('citezen_charter_write', 'off'))]
+		cud_safe(insert, insert_params)
 	
 	
 	if 'rules_and_procedure' in p:
-		insert ="insert into tbl_login_access set routes='/rules_and_procedure', login_id='"+str(p['login_id'])+"' , `read`='"+str(p.get('rules_and_procedure_read', 'off'))+"', `write`='"+str(p.get('rules_and_procedure_write', 'off'))+"'"
-		cud(insert)
+		insert ="""insert into tbl_login_access set routes='/rules_and_procedure', login_id=%s , `read`=%s, `write`=%s"""
+		insert_params = [str(p['login_id']), str(p.get('rules_and_procedure_read', 'off')), str(p.get('rules_and_procedure_write', 'off'))]
+		cud_safe(insert, insert_params)
 
 
 	if 'download_center' in p:
-		insert ="insert into tbl_login_access set routes='/download_center', login_id='"+str(p['login_id'])+"' , `read`='"+str(p.get('download_center_read', 'off'))+"', `write`='"+str(p.get('download_center_write', 'off'))+"'"
-		cud(insert)
+		insert ="""insert into tbl_login_access set routes='/download_center', login_id=%s , `read`=%s, `write`=%s"""
+		insert_params = [str(p['login_id']), str(p.get('download_center_read', 'off')), str(p.get('download_center_write', 'off'))]
+		cud_safe(insert, insert_params)
 
 	return jsonify("Succesfuly Updated")
 
@@ -8941,26 +9541,32 @@ def pre_register():
 	f=request.form
 	p=json.loads(f['Serialized'])
 
-	insert_gmail="insert into tbl_gmail set email='"+str(p['email'])+"', password='"+str(p['gmail_pass'])+"'"
-	cud(insert_gmail)
+	insert_gmail="""insert into tbl_gmail set email=%s, password=%s"""
+	insert_gmail_params = [str(p['email']), str(p['gmail_pass'])]
+	cud_safe(insert_gmail, insert_gmail_params)
 
-	insert_login="insert into tbl_login set username='"+str(p['username'])+"', password='"+str(p['password'])+"', role='2', fullname='"+str(p['fullname'])+"'"
-	cud(insert_login)
+	insert_login="""insert into tbl_login set username=%s, password=%s, role='2', fullname=%s"""
+	insert_login_params = [str(p['username']), str(p['password']), str(p['fullname'])]
+	cud_safe(insert_login, insert_login_params)
 
-	insert_config="insert into tbl_config_info set city_name='"+str(p['city'])+"', type=1"
-	cud(insert_config)
+	insert_config="""insert into tbl_config_info set city_name=%s, type=1"""
+	insert_config_params = [str(p['city'])]
+	cud_safe(insert_config, insert_config_params)
 
 	sp_year = str(p['sp_from'])+"-"+str(p['sp_to'])
-	insert_sp="insert into tbl_sp set sp_title='"+str(p['sp_title'])+"', sp_year='"+str(sp_year)+"', `status`='ACTIVE' "
-	ids = cud_callbackid(insert_sp)
+	insert_sp="""insert into tbl_sp set sp_title=%s, sp_year=%s, `status`='ACTIVE' """
+	insert_sp_params = [str(p['sp_title']), str(sp_year)]
+	ids = cud_callbackid_safe(insert_sp, insert_sp_params)
 
-	insert_member= "insert into sp_member set sp_mayor='"+str(p['mayor'])+"', sp_vice_mayor='"+str(p['vmayor'])+"', sp_secretary='"+str(p['sec'])+"', sp_id='"+str(ids)+"'"
-	ids_member =cud_callbackid(insert_member)
+	insert_member= """insert into sp_member set sp_mayor=%s, sp_vice_mayor=%s, sp_secretary=%s, sp_id=%s"""
+	insert_member_params = [str(p['mayor']), str(p['vmayor']), str(p['sec']), str(ids)]
+	ids_member =cud_callbackid_safe(insert_member, insert_member_params)
 
 	for i in p['council_name']:
 		print(i['council_name'])
-		insert_council = "insert into sp_councilor set councilor = '"+str(i['council_name'])+"', sp_member_id= '"+str(ids_member)+"'"
-		cud(insert_council)
+		insert_council = """insert into sp_councilor set councilor = %s, sp_member_id= %s"""
+		insert_council_params = [str(i['council_name']), str(ids_member)]
+		cud_safe(insert_council, insert_council_params)
 
 
 	for filename_array in request.files:
@@ -8970,7 +9576,7 @@ def pre_register():
 		n_path.resolve()
 
 		if file and allowed_file(file.filename):
-			filename = str(custom_secure_filename(file.filename)).replace("'","''")
+			filename = str(custom_secure_filename(file.filename))
 			if not os.path.exists(n_path):
 				os.mkdir(n_path)
 				app.config['UPLOAD_FOLDER']=n_path
@@ -8985,8 +9591,9 @@ def pre_register():
 			path_location=location.replace("/", "\\\\");
 			
 			split_name = str(file.filename).split(".")
-			insert2="update tbl_sp set city_logo='"+str(path_location)+"' where sp_id='"+str(ids)+"'"
-			cud(insert2)
+			insert2="""update tbl_sp set city_logo=%s where sp_id=%s"""
+			insert2_params = [str(path_location), str(ids)]
+			cud_safe(insert2, insert2_params)
 
 	return jsonify("Succesfuly Inserted")
 
@@ -8996,23 +9603,25 @@ def pre_register():
 def save_document_tracking():
 	f=request.form
 	p=json.loads(f['Serialized'])
-	title=p['title'].replace("'","''")
+	title=p['title']
 
 	if p['h_document_tracking']==0 or p['h_document_tracking']=="0":
 		insert="""
-			insert into tbl_document_tracking set tracking_no='"""+str(p['tracking_no'])+"""', 
-			date='"""+str(p['date_received'])+"""' , title='"""+str(p['title'])+"""', refferals_from='"""+str(p['refferal_from'])+"""', 
+			insert into tbl_document_tracking set tracking_no=%s, 
+			date=%s , title=%s, refferals_from=%s, 
 			action_taken = '1'
 		"""
-		rd=cud_callbackid(insert)
+		insert_params = [str(p['tracking_no']), str(p['date_received']), str(p['title']), str(p['refferal_from'])]
+		rd=cud_callbackid_safe(insert, insert_params)
 		ids = rd
 	else:
 		update="""
-			update tbl_document_tracking set tracking_no='"""+str(p['tracking_no'])+"""', date='"""+str(p['date_received'])+"""' , title='"""+str(title)+"""' , 
-			refferals_from='"""+str(p['refferal_from'])+"""', action_taken = '1'
-			where track_gen_id='"""+str(p['h_document_tracking'])+"""'
+			update tbl_document_tracking set tracking_no=%s, date=%s , title=%s , 
+			refferals_from=%s, action_taken = '1'
+			where track_gen_id=%s
 		"""
-		cud(update)
+		update_params = [str(p['tracking_no']), str(p['date_received']), str(title), str(p['refferal_from']), str(p['h_document_tracking'])]
+		cud_safe(update, update_params)
 		ids = p['h_document_tracking']
 
 	for filename_array in request.files:
@@ -9026,7 +9635,7 @@ def save_document_tracking():
 		n_path.resolve()
 
 		if file and allowed_file(file.filename):
-			filename = str(custom_secure_filename(file.filename)).replace("'","''")
+			filename = str(custom_secure_filename(file.filename))
 			if not os.path.exists(n_path):
 				os.mkdir(n_path)
 				app.config['UPLOAD_FOLDER']=n_path
@@ -9043,9 +9652,8 @@ def save_document_tracking():
 				split_name = str(file.filename).split(".")
 
 				if split_name:
-					query = "insert tbl_document_tracking_path set path='"+str(path_location.replace("'","''"))+"', filename='"+str(split_name[0].replace("'","''"))+"', track_gen_id='"+str(ids)+"'"
-					insert2=query
-					cud(insert2)
+					insert2 = "insert tbl_document_tracking_path set path=%s, filename=%s, track_gen_id=%s"
+					cud_safe(insert2, [str(path_location), str(split_name[0]), str(ids)])
 
 	return jsonify("Succesfuly Saved")
 
@@ -9055,9 +9663,10 @@ def save_document_tracking():
 def delete_document_tracking():
 	p= json.loads(request.data)
 	delete = """
-		delete from tbl_document_tracking  where track_gen_id='"""+str(p['track_gen_id'])+"""'
+		delete from tbl_document_tracking  where track_gen_id=%s
 	"""
-	cud(delete)
+	delete_params = [str(p['track_gen_id'])]
+	cud_safe(delete, delete_params)
 	return jsonify("Succesfuly Deleted")
 
 
@@ -9067,9 +9676,10 @@ def get_document_tracking_file():
 	p=json.loads(request.data)
 	sel="""
 		select * from tbl_document_tracking_path tmp
-		where track_gen_id='"""+str(p['track_gen_id'])+"""'
+		where track_gen_id=%s
 	"""
-	rd=pyread(sel)
+	sel_params = [str(p['track_gen_id'])]
+	rd=pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 @query.route('/get_document_tracking_raw_file', methods=['GET', 'POST'])
@@ -9078,28 +9688,32 @@ def get_document_tracking_raw_file():
 	p=json.loads(request.data)
 	sel="""
 		select * from tbl_document_tracking_path_raw tmp
-		where track_gen_id='"""+str(p['track_gen_id'])+"""'
+		where track_gen_id=%s
 	"""
-	rd=pyread(sel)
+	sel_params = [str(p['track_gen_id'])]
+	rd=pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 @query.route('/del_document_tracking_file', methods=['GET', 'POST'])
 @login_required
 def del_document_tracking_file():
 	p=json.loads(request.data)
-	sel="select * from tbl_document_tracking_path where documents_path_id='"+str(p['documents_path_id'])+"'"
-	rd=pyread(sel)
+	sel="""select * from tbl_document_tracking_path where documents_path_id=%s"""
+	sel_params = [str(p['documents_path_id'])]
+	rd=pyread_safe(sel, sel_params)
 	if rd:
 		n_path = Path(__file__).parent / "../static/uploads/" / rd[0]['path']
 		n_path.resolve()
 		if Path(n_path).is_file():
 			Path(n_path).unlink()
-			delete="delete from tbl_document_tracking_path where documents_path_id='"+str(p['documents_path_id'])+"'"
-			cud(delete)
+			delete="""delete from tbl_document_tracking_path where documents_path_id=%s"""
+			delete_params = [str(p['documents_path_id'])]
+			cud_safe(delete, delete_params)
 			return jsonify("Succesfuly Deleted")
 		else:
-			delete="delete from tbl_document_tracking_path where documents_path_id='"+str(p['documents_path_id'])+"'"
-			cud(delete)
+			delete="""delete from tbl_document_tracking_path where documents_path_id=%s"""
+			delete_params = [str(p['documents_path_id'])]
+			cud_safe(delete, delete_params)
 			return jsonify("File does not exist")
 	else:
 		return jsonify("Not exists in database")
@@ -9108,19 +9722,22 @@ def del_document_tracking_file():
 @login_required
 def del_document_tracking_raw_file():
 	p=json.loads(request.data)
-	sel="select * from tbl_document_tracking_path_raw where documents_path_id='"+str(p['documents_path_id'])+"'"
-	rd=pyread(sel)
+	sel="""select * from tbl_document_tracking_path_raw where documents_path_id=%s"""
+	sel_params = [str(p['documents_path_id'])]
+	rd=pyread_safe(sel, sel_params)
 	if rd:
 		n_path = Path(__file__).parent / "../static/uploads/" / rd[0]['path']
 		n_path.resolve()
 		if Path(n_path).is_file():
 			Path(n_path).unlink()
-			delete="delete from tbl_document_tracking_path_raw where documents_path_id='"+str(p['documents_path_id'])+"'"
-			cud(delete)
+			delete="""delete from tbl_document_tracking_path_raw where documents_path_id=%s"""
+			delete_params = [str(p['documents_path_id'])]
+			cud_safe(delete, delete_params)
 			return jsonify("Succesfuly Deleted")
 		else:
-			delete="delete from tbl_document_tracking_path_raw where documents_path_id='"+str(p['documents_path_id'])+"'"
-			cud(delete)
+			delete="""delete from tbl_document_tracking_path_raw where documents_path_id=%s"""
+			delete_params = [str(p['documents_path_id'])]
+			cud_safe(delete, delete_params)
 			return jsonify("File does not exist")
 	else:
 		return jsonify("Not exists in database")
@@ -9151,14 +9768,16 @@ def save_coucilor_assign():
 	p=json.loads(request.data)
 	if p['ids']==0 or p['ids']=='0':
 		insert = """
-			insert into sp_assignment set sp_assign='"""+str(p['title'])+"""', sp_councilor='"""+str(p['sp_councilor'])+"""'
+			insert into sp_assignment set sp_assign=%s, sp_councilor=%s
 		"""
-		cud(insert)
+		insert_params = [str(p['title']), str(p['sp_councilor'])]
+		cud_safe(insert, insert_params)
 	else:
 		update = """
-			update sp_assignment set sp_assign='"""+str(p['title'])+"""', sp_councilor='"""+str(p['sp_councilor'])+"""' where id='"""+str(p['id'])+"""'
+			update sp_assignment set sp_assign=%s, sp_councilor=%s where id=%s
 		"""
-		cud(update)
+		update_params = [str(p['title']), str(p['sp_councilor']), str(p['id'])]
+		cud_safe(update, update_params)
 	return jsonify("Succesfuly Saved")
 
 
@@ -9183,8 +9802,9 @@ def get_councilor_assignment():
 @login_required
 def del_councilor_assign():
 	p = json.loads(request.data)
-	delete="delete from sp_assignment where id='"+str(p['id'])+"'"
-	cud(delete)
+	delete="""delete from sp_assignment where id=%s"""
+	delete_params = [str(p['id'])]
+	cud_safe(delete, delete_params)
 	return jsonify('Succesfuly Deleted')
 
 
@@ -9195,9 +9815,10 @@ def get_specific_data_councilor():
 	sel = """
 		select * from sp_councilor sc
 		left join tbl_personal_info tpi on tpi.info_id=sc.councilor
-		where sp_councilor='"""+str(p['sp_councilor'])+"""' 
+		where sp_councilor=%s 
 	"""
-	rd = pyread(sel)
+	sel_params = [str(p['sp_councilor'])]
+	rd = pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 
@@ -9212,19 +9833,21 @@ def get_committee_reports_information():
 			from tbl_committee_report tcr
 			left join tbl_committee tc on tc.committee_id=tcr.committee_id
 			left join tbl_committee_reports_file rcrf on rcrf.committee_reports_id=tcr.id
-			where tcr.sp_id='"""+str(p['sp_id'])+"""' and tcr.committee_id='"""+str(p['committee_id'])+"""'
+			where tcr.sp_id=%s and tcr.committee_id=%s
 			group by tcr.id
 		"""
+		sel_params = [str(p['sp_id']), str(p['committee_id'])]
 	else:
 		sel = """
 			select * , group_concat(DISTINCT path) file
 			from tbl_committee_information  tci
 			left join tbl_committee tc on tc.committee_id=tci.committee_id
 			left join tbl_committee_information_file rcif on rcif.committee_information_id=tci.id
-			where tci.sp_id='"""+str(p['sp_id'])+"""' and tci.committee_id='"""+str(p['committee_id'])+"""'
+			where tci.sp_id=%s and tci.committee_id=%s
 			group by tci.id
 		"""
-	rd = pyread(sel)
+		sel_params = [str(p['sp_id']), str(p['committee_id'])]
+	rd = pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 
@@ -9238,10 +9861,11 @@ def get_committee_minutes_reports():
 		from tbl_committee_minutes tcr
 		left join tbl_committee tc on tc.committee_id=tcr.committee_id
 		left join tbl_committee_minutes_file rcrf on rcrf.committee_minutes_id=tcr.id
-		where tcr.sp_id='"""+str(p['sp_id'])+"""' and tcr.committee_id='"""+str(p['committee_id'])+"""'
+		where tcr.sp_id=%s and tcr.committee_id=%s
 		group by tcr.id
 	"""
-	rd = pyread(sel)
+	sel_params = [str(p['sp_id']), str(p['committee_id'])]
+	rd = pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 @query.route('/get_councilor_info_documents', methods = ['POST','GET'])
@@ -9252,17 +9876,18 @@ def get_councilor_info_documents():
 		select ordinance_title title, date_enacted, ordinance_number, 'Author' type 
 		from tbl_ordinance_author toa
 		left join tbl_ordinance tord on tord.ordinance_id=toa.ordinance_id
-		where toa.author='"""+str(p['info_id'])+"""' and tord.ordinance_number is not null
+		where toa.author=%s and tord.ordinance_number is not null
 
 		union
 
 		select ordinance_title title, date_enacted, ordinance_number, 'Sponsor' type 
 		from tbl_ordinance_sponsor toa
 		left join tbl_ordinance tord on tord.ordinance_id=toa.ordinance_id
-		where toa.sponsor='"""+str(p['info_id'])+"""' and tord.ordinance_number is not null
+		where toa.sponsor=%s and tord.ordinance_number is not null
 
 	"""
-	rd = pyread(sel)
+	sel_params = [str(p['info_id']), str(p['info_id'])]
+	rd = pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 
@@ -9288,11 +9913,12 @@ def save_committee_minutes():
 
 	if p['h_committee_minutes_id']=='0':
 		insert = """
-			insert into tbl_committee_minutes set tracking_number='"""+str(p['tracking_number'])+"""', 
-			subject='"""+str(p['subject'])+"""', committee_id='"""+str(p['committee_id'])+"""', 
-			date='"""+str(p['date'])+"""', sp_id = '"""+str(p['sp_id'])+"""'
+			insert into tbl_committee_minutes set tracking_number=%s, 
+			subject=%s, committee_id=%s, 
+			date=%s, sp_id = %s
 		"""
-		ids = cud_callbackid(insert)
+		insert_params = [str(p['tracking_number']), str(p['subject']), str(p['committee_id']), str(p['date']), str(p['sp_id'])]
+		ids = cud_callbackid_safe(insert, insert_params)
 
 		for filename_array in request.files:
 			file=request.files[filename_array]
@@ -9304,7 +9930,7 @@ def save_committee_minutes():
 			location=""+str(loc)+"//"+str(ids)
 			location.replace("//", "\\\\");
 			if file and allowed_file(file.filename):
-				filename = str(custom_secure_filename(file.filename)).replace("'","''")
+				filename = str(custom_secure_filename(file.filename))
 				if not os.path.exists(location):
 					os.mkdir(location)
 					app.config['UPLOAD_FOLDER']=location
@@ -9317,15 +9943,17 @@ def save_committee_minutes():
 				path_location=location.replace("/", "\\\\");
 			os.chdir(cwd)
 
-			insert2="insert into tbl_committee_minutes_file set path='"+str(path_location)+"' , filename='"+str(filename.replace("'",""))+"' , committee_minutes_id='"+str(ids)+"'"
-			cud(insert2)
+			insert2="""insert into tbl_committee_minutes_file set path=%s , filename=%s , committee_minutes_id=%s"""
+			insert2_params = [str(path_location), str(filename.replace("'","")), str(ids)]
+			cud_safe(insert2, insert2_params)
 	else:
 		update = """
-			update  tbl_committee_minutes set tracking_number='"""+str(p['tracking_number'])+"""', subject='"""+str(p['subject'])+"""',
-			committee_id='"""+str(p['committee_id'])+"""', date='"""+str(p['date'])+"""' , sp_id = '"""+str(p['sp_id'])+"""'
-			where id='"""+str(p['h_committee_minutes_id'])+"""'
+			update  tbl_committee_minutes set tracking_number=%s, subject=%s,
+			committee_id=%s, date=%s , sp_id = %s
+			where id=%s
 		"""
-		cud(update)
+		update_params = [str(p['tracking_number']), str(p['subject']), str(p['committee_id']), str(p['date']), str(p['sp_id']), str(p['h_committee_minutes_id'])]
+		cud_safe(update, update_params)
 
 		for filename_array in request.files:
 			file=request.files[filename_array]
@@ -9337,7 +9965,7 @@ def save_committee_minutes():
 			location=""+str(loc)+"//"+str(p['h_committee_minutes_id'])
 			location.replace("//", "\\\\");
 			if file and allowed_file(file.filename):
-				filename = str(custom_secure_filename(file.filename)).replace("'","''")
+				filename = str(custom_secure_filename(file.filename))
 				if not os.path.exists(location):
 					os.mkdir(location)
 					app.config['UPLOAD_FOLDER']=location
@@ -9350,8 +9978,9 @@ def save_committee_minutes():
 				path_location=location.replace("/", "\\\\");
 			os.chdir(cwd)
 
-			insert2="insert into tbl_committee_minutes_file set path='"+str(path_location)+"' , filename='"+str(filename.replace("'",""))+"' , committee_minutes_id='"+str(p['h_committee_minutes_id'])+"'"
-			cud(insert2)
+			insert2="""insert into tbl_committee_minutes_file set path=%s , filename=%s , committee_minutes_id=%s"""
+			insert2_params = [str(path_location), str(filename.replace("'","")), str(p['h_committee_minutes_id'])]
+			cud_safe(insert2, insert2_params)
 
 	return jsonify("Succesfuly Saved")
 
@@ -9388,46 +10017,53 @@ def get_session_list_report():
 		sel= """
 			select * from tbl_session order
 		"""
+		sel_params = []
 	elif p['type']!=0 and p['term']!=0 and p['from']!=0 and p['to']!=0:
 		prnt_R(2)
 		sel= """
 			select * from tbl_session 
-			where (session_date between '"""+str(p['from'])+"""' and '"""+str(p['to'])+"""') 
-			and sp_number='"""+str(p['term'])+"""' and session_type='"""+str(p['type'])+"""'
+			where (session_date between %s and %s) 
+			and sp_number=%s and session_type=%s
 		"""
+		sel_params = [str(p['from']), str(p['to']), str(p['term']), str(p['type'])]
 	elif p['type']!=0 and p['term']==0 and p['from']==0 and p['to']==0:
 		prnt_R(3)
 		sel= """
 			select * from tbl_session 
-			where session_type='"""+str(p['type'])+"""'
+			where session_type=%s
 		"""
+		sel_params = [str(p['type'])]
 	elif p['type']!=0 and p['term']!=0 and p['from']==0 and p['to']==0:
 		prnt_R(4)
 		sel= """
 			select * from tbl_session 
-			where session_type='"""+str(p['type'])+"""' and sp_number='"""+str(p['term'])+"""'
+			where session_type=%s and sp_number=%s
 		"""
+		sel_params = [str(p['type']), str(p['term'])]
 	elif p['type']==0 and p['term']!=0 and p['from']==0 and p['to']==0:
 		prnt_R(5)
 		sel= """
 			select * from tbl_session 
-			where sp_number='"""+str(p['term'])+"""'
+			where sp_number=%s
 		"""
+		sel_params = [str(p['term'])]
 	elif p['type']==0 and p['term']!=0 and p['from']!=0 and p['to']!=0:
 		prnt_R(6)
 		sel= """
 			select * from tbl_session 
-			where (session_date between '"""+str(p['from'])+"""' and '"""+str(p['to'])+"""') 
-			and sp_number='"""+str(p['term'])+"""'
+			where (session_date between %s and %s) 
+			and sp_number=%s
 		"""
+		sel_params = [str(p['from']), str(p['to']), str(p['term'])]
 	elif p['type']!=0 and p['term']==0 and p['from']!=0 and p['to']!=0:
 		prnt_R(7)
 		sel= """
 			select * from tbl_session 
-			where (session_date between '"""+str(p['from'])+"""' and '"""+str(p['to'])+"""') 
-			and session_type='"""+str(p['type'])+"""'
+			where (session_date between %s and %s) 
+			and session_type=%s
 		"""
-	rd= pyread(sel)
+		sel_params = [str(p['from']), str(p['to']), str(p['type'])]
+	rd= pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 
@@ -9436,9 +10072,10 @@ def get_session_list_report():
 def get_recitation_file():
 	p=json.loads(request.data)
 	sel="""
-		select * from tbl_session_recitation_path where session_id='"""+str(p['session_id'])+"""'
+		select * from tbl_session_recitation_path where session_id=%s
 	"""
-	rd=pyread(sel)
+	sel_params = [str(p['session_id'])]
+	rd=pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 @query.route('/get_reading_file', methods = ['POST','GET'])
@@ -9446,9 +10083,10 @@ def get_recitation_file():
 def get_reading_file():
 	p=json.loads(request.data)
 	sel="""
-		select * from tbl_session_reading_path where session_id='"""+str(p['session_id'])+"""'
+		select * from tbl_session_reading_path where session_id=%s
 	"""
-	rd=pyread(sel)
+	sel_params = [str(p['session_id'])]
+	rd=pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 
@@ -9457,9 +10095,10 @@ def get_reading_file():
 def get_privilege_hour_file():
 	p=json.loads(request.data)
 	sel="""
-		select * from tbl_session_privilege_path where session_id='"""+str(p['session_id'])+"""'
+		select * from tbl_session_privilege_path where session_id=%s
 	"""
-	rd=pyread(sel)
+	sel_params = [str(p['session_id'])]
+	rd=pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 @query.route('/get_announcement_file', methods = ['POST','GET'])
@@ -9467,9 +10106,10 @@ def get_privilege_hour_file():
 def get_announcement_file():
 	p=json.loads(request.data)
 	sel="""
-		select * from tbl_session_announcement_path where session_id='"""+str(p['session_id'])+"""'
+		select * from tbl_session_announcement_path where session_id=%s
 	"""
-	rd=pyread(sel)
+	sel_params = [str(p['session_id'])]
+	rd=pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 	
@@ -9478,8 +10118,9 @@ def get_announcement_file():
 @login_required
 def get_attendance_by_session():
 	p=json.loads(request.data)
-	sel_roll_call = "select *, CONCAT(tri.f_name,' ',tri.m_name, ' ', tri.l_name) as fullname FROM tbl_session_roll_call tsrc LEFT JOIN tbl_personal_info tri on tsrc.info_id = tri.info_id WHERE tsrc.session_id = '"+str(p['session_id'])+"'"
-	rd = pyread(sel_roll_call)
+	sel_roll_call = """select *, CONCAT(tri.f_name,' ',tri.m_name, ' ', tri.l_name) as fullname FROM tbl_session_roll_call tsrc LEFT JOIN tbl_personal_info tri on tsrc.info_id = tri.info_id WHERE tsrc.session_id = %s"""
+	sel_roll_call_params = [str(p['session_id'])]
+	rd = pyread_safe(sel_roll_call, sel_roll_call_params)
 	return jsonify(rd)
 
 
@@ -9492,9 +10133,10 @@ def get_session_attendance():
 		session_id, status
 		FROM tbl_session_roll_call tsrc
 		LEFT JOIN tbl_personal_info tri on tsrc.info_id = tri.info_id 
-		WHERE tsrc.session_id = '"""+str(p['session_id'])+"""'
+		WHERE tsrc.session_id = %s
 	"""
-	rd = pyread(sel_roll_call)
+	sel_roll_call_params = [str(p['session_id'])]
+	rd = pyread_safe(sel_roll_call, sel_roll_call_params)
 	return jsonify(rd)
 
 
@@ -9506,16 +10148,18 @@ def save_session_attendance():
 		if i:
 			if i['id']!='':
 				update = """
-					update tbl_session_roll_call set status='"""+str(i['status'])+"""' 
-					where roll_call_id='"""+str(i['id'])+"""' and session_id='"""+str(p['session_id'])+"""'
+					update tbl_session_roll_call set status=%s 
+					where roll_call_id=%s and session_id=%s
 				"""
-				cud(update)
+				update_params = [str(i['status']), str(i['id']), str(p['session_id'])]
+				cud_safe(update, update_params)
 			else:
 				insert = """
-				 	insert into tbl_session_roll_call set status='"""+str(i['status'])+"""',
-				 	session_id='"""+str(p['session_id'])+"""', info_id='"""+str(i['info_id'])+"""'
+				 	insert into tbl_session_roll_call set status=%s,
+				 	session_id=%s, info_id=%s
 				"""
-				cud(insert)
+				insert_params = [str(i['status']), str(p['session_id']), str(i['info_id'])]
+				cud_safe(insert, insert_params)
 	return jsonify(p)
 
 
@@ -9524,9 +10168,10 @@ def save_session_attendance():
 def delete_people_attendance():
 	p=json.loads(request.data)
 	delete="""
-		delete from tbl_session_roll_call where roll_call_id='"""+str(p['id'])+"""'
+		delete from tbl_session_roll_call where roll_call_id=%s
 	"""
-	cud(delete)
+	delete_params = [str(p['id'])]
+	cud_safe(delete, delete_params)
 	return jsonify("Succesfully deleted")
 
 
@@ -9535,9 +10180,10 @@ def delete_people_attendance():
 def delete_session():
 	p=json.loads(request.data)
 	delete = """
-		delete from tbl_session where session_id='"""+str(p['session_id'])+"""'
+		delete from tbl_session where session_id=%s
 	"""
-	cud(delete)
+	delete_params = [str(p['session_id'])]
+	cud_safe(delete, delete_params)
 	return jsonify("Succesfuly Deleted")
 
 
@@ -9545,54 +10191,53 @@ def delete_session():
 @query.route('/save_propose', methods = ['POST','GET'])
 def save_propose():
 	p=json.loads(request.data)
-	select  = "select action_taken from tbl_document_tracking where track_gen_id="+str(p['track_gen_id'])+" "
-	rd = pyread(select)
+	select  = """select action_taken from tbl_document_tracking where track_gen_id=%s """
+	select_params = [str(p['track_gen_id'])]
+	rd = pyread_safe(select, select_params)
 
 	if rd[0]['action_taken']=="1":
 		update = """
-			update tbl_document_tracking set action_taken = 2, doc_status='' where track_gen_id='"""+str(p['track_gen_id'])+"""'
+			update tbl_document_tracking set action_taken = 2, doc_status='' where track_gen_id=%s
 		"""
-		cud(update)
+		update_params = [str(p['track_gen_id'])]
+		cud_safe(update, update_params)
 
 		delete_ref = """
-			delete from tbl_document_tracking_refferal where track_gen_id='"""+str(p['track_gen_id'])+"""'
+			delete from tbl_document_tracking_refferal where track_gen_id=%s
 		"""
-		cud(delete_ref)
+		delete_ref_params = [str(p['track_gen_id'])]
+		cud_safe(delete_ref, delete_ref_params)
 
-	f_committee = ""
-	for index, i in enumerate(p['committee_ids'][0]):
-		f_committee = f_committee +"committee_id="+str(i)+" or "
-		if index==(len(p['committee_ids'][0])-1):
-			f_committee = f_committee + "committee_id="+str(i)+""
-
-	select_committee = """
-		select group_concat(committee) committees from tbl_committee where """+str(f_committee)+"""
-	"""
-	rd_com = pyread(select_committee)
+	committee_id_list = [str(i) for i in p['committee_ids'][0]]
+	select_committee = "select group_concat(committee) committees from tbl_committee where committee_id in (" + ",".join(["%s"] * len(committee_id_list)) + ")"
+	rd_com = pyread_safe(select_committee, committee_id_list)
 
 	n_committe = str(p['committee_ids'][0]).replace('[','').replace(']','').replace('\'','').replace('\"','')
 
 	insert = """
-		insert into tbl_document_tracking_refferal set track_gen_id='"""+str(p['track_gen_id'])+"""',
-		committtee='"""+str(n_committe)+"""'
+		insert into tbl_document_tracking_refferal set track_gen_id=%s,
+		committtee=%s
 	"""
-	cud(insert)
+	insert_params = [str(p['track_gen_id']), str(n_committe)]
+	cud_safe(insert, insert_params)
 
 	insert_status = """
-		insert into tbl_document_tracking_status set track_gen_id='"""+str(p['track_gen_id'])+"""',
-		status='Approved as 1st Reading and Reffered to Committee', remarks='"""+str(rd_com[0]['committees'])+"""', date=now()
+		insert into tbl_document_tracking_status set track_gen_id=%s,
+		status='Approved as 1st Reading and Reffered to Committee', remarks=%s, date=now()
 	"""
-	cud(insert_status)
+	insert_status_params = [str(p['track_gen_id']), str(rd_com[0]['committees'])]
+	cud_safe(insert_status, insert_status_params)
 
 	sel = """
 		select group_concat(tc.committee SEPARATOR ' - ') committee from tbl_document_tracking tdt
 		left join tbl_session_proposed_ordi tspo on tdt.track_gen_id=tspo.tracking_no
 		left join tbl_document_tracking_refferal tdtr on tdtr.track_gen_id=tdt.track_gen_id
 		left JOIN tbl_committee tc ON FIND_IN_SET(tc.committee_id, REPLACE(tdtr.committtee, " ", ""))
-		where tdt.track_gen_id = '"""+str(p['track_gen_id'])+"""'
+		where tdt.track_gen_id = %s
 
 	"""
-	rd= pyread(sel)
+	sel_params = [str(p['track_gen_id'])]
+	rd= pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 
@@ -9600,54 +10245,53 @@ def save_propose():
 @login_required
 def save_second():
 	p=json.loads(request.data)
-	select  = "select action_taken from tbl_document_tracking where track_gen_id="+str(p['track_gen_id'])+" "
-	rd = pyread(select)
+	select  = """select action_taken from tbl_document_tracking where track_gen_id=%s """
+	select_params = [str(p['track_gen_id'])]
+	rd = pyread_safe(select, select_params)
 
 	if rd[0]['action_taken']=="2":
 		update = """
-			update tbl_document_tracking set action_taken = 3, doc_status='' where track_gen_id='"""+str(p['track_gen_id'])+"""'
+			update tbl_document_tracking set action_taken = 3, doc_status='' where track_gen_id=%s
 		"""
-		cud(update)
+		update_params = [str(p['track_gen_id'])]
+		cud_safe(update, update_params)
 
 		delete_ref = """
-			delete from tbl_document_tracking_refferal where track_gen_id='"""+str(p['track_gen_id'])+"""'
+			delete from tbl_document_tracking_refferal where track_gen_id=%s
 		"""
-		cud(delete_ref)
+		delete_ref_params = [str(p['track_gen_id'])]
+		cud_safe(delete_ref, delete_ref_params)
 
-	f_committee = ""
-	for index, i in enumerate(p['committee_ids'][0]):
-		f_committee = f_committee +"committee_id="+str(i)+" or "
-		if index==(len(p['committee_ids'][0])-1):
-			f_committee = f_committee + "committee_id="+str(i)+""
-
-	select_committee = """
-		select group_concat(committee) committees from tbl_committee where """+str(f_committee)+"""
-	"""
-	rd_com = pyread(select_committee)
+	committee_id_list = [str(i) for i in p['committee_ids'][0]]
+	select_committee = "select group_concat(committee) committees from tbl_committee where committee_id in (" + ",".join(["%s"] * len(committee_id_list)) + ")"
+	rd_com = pyread_safe(select_committee, committee_id_list)
 
 	n_committe = str(p['committee_ids'][0]).replace('[','').replace(']','').replace('\'','').replace('\"','')
 
 	insert = """
-		insert into tbl_document_tracking_refferal set track_gen_id='"""+str(p['track_gen_id'])+"""',
-		committtee='"""+str(n_committe)+"""'
+		insert into tbl_document_tracking_refferal set track_gen_id=%s,
+		committtee=%s
 	"""
-	cud(insert)
+	insert_params = [str(p['track_gen_id']), str(n_committe)]
+	cud_safe(insert, insert_params)
 
 	insert_status = """
-		insert into tbl_document_tracking_status set track_gen_id='"""+str(p['track_gen_id'])+"""',
-		status='Approved as 2nd Reading and Reffered to Committee', remarks='"""+str(rd_com[0]['committees'])+"""', date=now()
+		insert into tbl_document_tracking_status set track_gen_id=%s,
+		status='Approved as 2nd Reading and Reffered to Committee', remarks=%s, date=now()
 	"""
-	cud(insert_status)
+	insert_status_params = [str(p['track_gen_id']), str(rd_com[0]['committees'])]
+	cud_safe(insert_status, insert_status_params)
 
 	sel = """
 		select group_concat(tc.committee SEPARATOR ' - ') committee from tbl_document_tracking tdt
 		left join tbl_session_proposed_ordi tspo on tdt.track_gen_id=tspo.tracking_no
 		left join tbl_document_tracking_refferal tdtr on tdtr.track_gen_id=tdt.track_gen_id
 		left JOIN tbl_committee tc ON FIND_IN_SET(tc.committee_id, REPLACE(tdtr.committtee, " ", ""))
-		where tdt.track_gen_id = '"""+str(p['track_gen_id'])+"""'
+		where tdt.track_gen_id = %s
 
 	"""
-	rd= pyread(sel)
+	sel_params = [str(p['track_gen_id'])]
+	rd= pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 
@@ -9656,28 +10300,32 @@ def save_second():
 def disapproved_proposed():
 	p=json.loads(request.data)
 	update = """
-		update tbl_document_tracking set action_taken=1, doc_status = 1 where track_gen_id='"""+str(p['track_gen_id'])+"""'
+		update tbl_document_tracking set action_taken=1, doc_status = 1 where track_gen_id=%s
 	"""
-	cud(update)
+	update_params = [str(p['track_gen_id'])]
+	cud_safe(update, update_params)
 
-	delete = "delete from tbl_document_tracking_refferal where track_gen_id="+str(p['track_gen_id'])+""
-	cud(delete)
+	delete = """delete from tbl_document_tracking_refferal where track_gen_id=%s"""
+	delete_params = [str(p['track_gen_id'])]
+	cud_safe(delete, delete_params)
 
 	insert_status = """
-		insert into tbl_document_tracking_status set track_gen_id='"""+str(p['track_gen_id'])+"""',
+		insert into tbl_document_tracking_status set track_gen_id=%s,
 		status='Disapproved', remarks='Disapproved', date=now()
 	"""
-	cud(insert_status)
+	insert_status_params = [str(p['track_gen_id'])]
+	cud_safe(insert_status, insert_status_params)
 
 	sel = """
 		select group_concat(tc.committee SEPARATOR ' - ') committee from tbl_document_tracking tdt
 		left join tbl_session_proposed_ordi tspo on tdt.track_gen_id=tspo.tracking_no
 		left join tbl_document_tracking_refferal tdtr on tdtr.track_gen_id=tdt.track_gen_id
 		left JOIN tbl_committee tc ON FIND_IN_SET(tc.committee_id, REPLACE(tdtr.committtee, " ", ""))
-		where tdt.track_gen_id = '"""+str(p['track_gen_id'])+"""'
+		where tdt.track_gen_id = %s
 
 	"""
-	rd= pyread(sel)
+	sel_params = [str(p['track_gen_id'])]
+	rd= pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 
@@ -9687,9 +10335,10 @@ def get_document_tracking_where_trackgenId():
 	sel = """
 		select * from tbl_document_tracking tdt
 		left join tbl_document_tracking_refferal tdtr on tdtr.track_gen_id=tdt.track_gen_id
-		where tdt.track_gen_id='"""+str(p['track_gen_id'])+"""'
+		where tdt.track_gen_id=%s
 	"""
-	rd = pyread(sel)
+	sel_params = [str(p['track_gen_id'])]
+	rd = pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 
@@ -9698,46 +10347,43 @@ def get_document_tracking_where_trackgenId():
 def update_proposed():
 	p=json.loads(request.data)
 	delete_ref = """
-		delete from tbl_document_tracking_refferal where track_gen_id='"""+str(p['track_gen_id'])+"""'
+		delete from tbl_document_tracking_refferal where track_gen_id=%s
 	"""
-	cud(delete_ref)
+	delete_ref_params = [str(p['track_gen_id'])]
+	cud_safe(delete_ref, delete_ref_params)
 
 	n_committe = str(p['committee_ids'][0]).replace('[','').replace(']','').replace('\'','').replace('\"','')
 
-	f_committee = ""
-	for index, i in enumerate(p['committee_ids'][0]):
-		f_committee = f_committee +"committee_id="+str(i)+" or "
-		if index==(len(p['committee_ids'][0])-1):
-			f_committee = f_committee + "committee_id="+str(i)+""
-
-	select_committee = """
-		select group_concat(committee) committees from tbl_committee where """+str(f_committee)+"""
-	"""
-	rd_com = pyread(select_committee)
+	committee_id_list = [str(i) for i in p['committee_ids'][0]]
+	select_committee = "select group_concat(committee) committees from tbl_committee where committee_id in (" + ",".join(["%s"] * len(committee_id_list)) + ")"
+	rd_com = pyread_safe(select_committee, committee_id_list)
 
 	n_committe = str(p['committee_ids'][0]).replace('[','').replace(']','').replace('\'','').replace('\"','')
 
 	insert = """
-		insert into tbl_document_tracking_refferal set track_gen_id='"""+str(p['track_gen_id'])+"""',
-		committtee='"""+str(n_committe)+"""'
+		insert into tbl_document_tracking_refferal set track_gen_id=%s,
+		committtee=%s
 	"""
-	cud(insert)
+	insert_params = [str(p['track_gen_id']), str(n_committe)]
+	cud_safe(insert, insert_params)
 
 	insert_status = """
-		insert into tbl_document_tracking_status set track_gen_id='"""+str(p['track_gen_id'])+"""',
-		status='Change of Reffered Committee', remarks='"""+str(rd_com[0]['committees'])+"""', date=now()
+		insert into tbl_document_tracking_status set track_gen_id=%s,
+		status='Change of Reffered Committee', remarks=%s, date=now()
 	"""
-	cud(insert_status)
+	insert_status_params = [str(p['track_gen_id']), str(rd_com[0]['committees'])]
+	cud_safe(insert_status, insert_status_params)
 
 	sel = """
 		select group_concat(tc.committee SEPARATOR ' - ') committee from tbl_document_tracking tdt
 		left join tbl_session_proposed_ordi tspo on tdt.track_gen_id=tspo.tracking_no
 		left join tbl_document_tracking_refferal tdtr on tdtr.track_gen_id=tdt.track_gen_id
 		left JOIN tbl_committee tc ON FIND_IN_SET(tc.committee_id, REPLACE(tdtr.committtee, " ", ""))
-		where tdt.track_gen_id = '"""+str(p['track_gen_id'])+"""'
+		where tdt.track_gen_id = %s
 
 	"""
-	rd= pyread(sel)
+	sel_params = [str(p['track_gen_id'])]
+	rd= pyread_safe(sel, sel_params)
 
 	return jsonify(rd)
 
@@ -9753,15 +10399,17 @@ def approve_document():
 		n = "3rd"
 	stat = "Approved as " + n + " reading"
 	upd = """
-		update tbl_document_tracking set action_taken='"""+str(int(p['status'])+1)+"""' where track_gen_id='"""+str(p['track_gen_id'])+"""'
+		update tbl_document_tracking set action_taken=%s where track_gen_id=%s
 	"""
-	cud(upd)
+	upd_params = [str(int(p['status'])+1), str(p['track_gen_id'])]
+	cud_safe(upd, upd_params)
 
 	insert_status = """
-		insert into tbl_document_tracking_status set track_gen_id='"""+str(p['track_gen_id'])+"""',
-		status='"""+str(stat)+"""', remarks='Approved', date=now()
+		insert into tbl_document_tracking_status set track_gen_id=%s,
+		status=%s, remarks='Approved', date=now()
 	"""
-	cud(insert_status)
+	insert_status_params = [str(p['track_gen_id']), str(stat)]
+	cud_safe(insert_status, insert_status_params)
 	return jsonify("Succesfuly Saved")
 
 
@@ -9780,15 +10428,17 @@ def cancel_document():
 	stat = "Approved as " + n + " reading"
 
 	upd = """
-		update tbl_document_tracking set action_taken='"""+str(int(p['status']))+"""' where track_gen_id='"""+str(p['track_gen_id'])+"""'
+		update tbl_document_tracking set action_taken=%s where track_gen_id=%s
 	"""
-	cud(upd)
+	upd_params = [str(int(p['status'])), str(p['track_gen_id'])]
+	cud_safe(upd, upd_params)
 
 	delete = """
-		delete from tbl_document_tracking_status where track_gen_id='"""+str(p['track_gen_id'])+"""' and 
-		status='"""+str(stat)+"""'
+		delete from tbl_document_tracking_status where track_gen_id=%s and 
+		status=%s
 	"""
-	cud(delete)
+	delete_params = [str(p['track_gen_id']), str(stat)]
+	cud_safe(delete, delete_params)
 
 	return jsonify("Succesfuly Canceled")
 
@@ -9797,9 +10447,10 @@ def cancel_document():
 def get_document_status_tracking():
 	p=json.loads(request.data)
 	sel = """
-		select * from tbl_document_tracking where track_gen_id='"""+str(p['track_gen_id'])+"""'
+		select * from tbl_document_tracking where track_gen_id=%s
 	"""
-	rd= pyread(sel)
+	sel_params = [str(p['track_gen_id'])]
+	rd= pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 
@@ -9813,86 +10464,126 @@ def save_doc_authors():
 		prnt_Y("insert")
 	else:
 		prnt_Y("update")
-		delete_author = "delete from tbl_document_tracking_author where track_gen_id='"+str(p['track_gen_id'])+"'"
-		cud(delete_author)
-		delete_coauthor = "delete from tbl_document_tracking_coauthor where track_gen_id='"+str(p['track_gen_id'])+"'"
-		cud(delete_coauthor)
-		delete_sponsor = "delete from tbl_document_tracking_sponsor where track_gen_id='"+str(p['track_gen_id'])+"'"
-		cud(delete_sponsor)
-		delete_cosponsor = "delete from tbl_document_tracking_cosponsor where track_gen_id='"+str(p['track_gen_id'])+"'"
-		cud(delete_cosponsor)
+		delete_author = """delete from tbl_document_tracking_author where track_gen_id=%s"""
+		delete_author_params = [str(p['track_gen_id'])]
+		cud_safe(delete_author, delete_author_params)
+		delete_coauthor = """delete from tbl_document_tracking_coauthor where track_gen_id=%s"""
+		delete_coauthor_params = [str(p['track_gen_id'])]
+		cud_safe(delete_coauthor, delete_coauthor_params)
+		delete_sponsor = """delete from tbl_document_tracking_sponsor where track_gen_id=%s"""
+		delete_sponsor_params = [str(p['track_gen_id'])]
+		cud_safe(delete_sponsor, delete_sponsor_params)
+		delete_cosponsor = """delete from tbl_document_tracking_cosponsor where track_gen_id=%s"""
+		delete_cosponsor_params = [str(p['track_gen_id'])]
+		cud_safe(delete_cosponsor, delete_cosponsor_params)
 
 	if "input_authors" in p:
 		for i in p['input_authors']:
 			insert_author = """
-				insert into tbl_document_tracking_author set councilor='"""+str(i)+"""', track_gen_id='"""+str(p['track_gen_id'])+"""'
+				insert into tbl_document_tracking_author set councilor=%s, track_gen_id=%s
 			"""
-			cud(insert_author)
+			insert_author_params = [str(i), str(p['track_gen_id'])]
+			cud_safe(insert_author, insert_author_params)
 
 	if "input_coauthors" in p:
 		for i in p['input_coauthors']:
 			insert_coauthors = """
-				insert into tbl_document_tracking_coauthor set councilor='"""+str(i)+"""', track_gen_id='"""+str(p['track_gen_id'])+"""'
+				insert into tbl_document_tracking_coauthor set councilor=%s, track_gen_id=%s
 			"""
-			cud(insert_coauthors)
+			insert_coauthors_params = [str(i), str(p['track_gen_id'])]
+			cud_safe(insert_coauthors, insert_coauthors_params)
 
 	if "input_sponsors" in p:
 		for i in p['input_sponsors']:
 			insert_sponsors = """
-				insert into tbl_document_tracking_sponsor set councilor='"""+str(i)+"""', track_gen_id='"""+str(p['track_gen_id'])+"""'
+				insert into tbl_document_tracking_sponsor set councilor=%s, track_gen_id=%s
 			"""
-			cud(insert_sponsors)
+			insert_sponsors_params = [str(i), str(p['track_gen_id'])]
+			cud_safe(insert_sponsors, insert_sponsors_params)
 
 	if "input_cosponsors" in p:
 		for i in p['input_cosponsors']:
 			insert_cosponsors = """
-				insert into tbl_document_tracking_cosponsor set councilor='"""+str(i)+"""', track_gen_id='"""+str(p['track_gen_id'])+"""'
+				insert into tbl_document_tracking_cosponsor set councilor=%s, track_gen_id=%s
 			"""
-			cud(insert_cosponsors)
+			insert_cosponsors_params = [str(i), str(p['track_gen_id'])]
+			cud_safe(insert_cosponsors, insert_cosponsors_params)
 	return jsonify("Succesfuly Saved")
 
 
 
-@query.route('/get_document_tracking_authors', methods = ['POST','GET'])
+@query.route('/get_document_tracking_authors', methods=['POST','GET'])
 @login_required
 def get_document_tracking_authors():
-	p=json.loads(request.data)
-	sel= """
-		select * from tbl_document_tracking_author where track_gen_id='"""+str(p['track_gen_id'])+"""'
+	p = json.loads(request.data)
+	
+	# Validate input
+	track_gen_id = validate_int(p.get('track_gen_id', 0))
+	
+	if track_gen_id <= 0:
+		return jsonify({"error": "Invalid track_gen_id"}), 400
+	
+	# Use parameterized query
+	sel = """
+		SELECT * FROM tbl_document_tracking_author WHERE track_gen_id=%s
 	"""
-	rd=pyread(sel)
+	rd = pyread_safe(sel, (track_gen_id,))
 	return jsonify(rd)
 
 
-@query.route('/get_document_tracking_coauthors', methods = ['POST','GET'])
+@query.route('/get_document_tracking_coauthors', methods=['POST','GET'])
 @login_required
 def get_document_tracking_coauthors():
-	p=json.loads(request.data)
-	sel= """
-		select * from tbl_document_tracking_coauthor where track_gen_id='"""+str(p['track_gen_id'])+"""'
+	p = json.loads(request.data)
+	
+	# Validate input
+	track_gen_id = validate_int(p.get('track_gen_id', 0))
+	
+	if track_gen_id <= 0:
+		return jsonify({"error": "Invalid track_gen_id"}), 400
+	
+	# Use parameterized query
+	sel = """
+		SELECT * FROM tbl_document_tracking_coauthor WHERE track_gen_id=%s
 	"""
-	rd=pyread(sel)
+	rd = pyread_safe(sel, (track_gen_id,))
 	return jsonify(rd)
 
 
-@query.route('/get_document_tracking_sponsor', methods = ['POST','GET'])
+@query.route('/get_document_tracking_sponsor', methods=['POST','GET'])
 @login_required
 def get_document_tracking_sponsor():
-	p=json.loads(request.data)
-	sel= """
-		select * from tbl_document_tracking_sponsor where track_gen_id='"""+str(p['track_gen_id'])+"""'
+	p = json.loads(request.data)
+	
+	# Validate input
+	track_gen_id = validate_int(p.get('track_gen_id', 0))
+	
+	if track_gen_id <= 0:
+		return jsonify({"error": "Invalid track_gen_id"}), 400
+	
+	# Use parameterized query
+	sel = """
+		SELECT * FROM tbl_document_tracking_sponsor WHERE track_gen_id=%s
 	"""
-	rd=pyread(sel)
+	rd = pyread_safe(sel, (track_gen_id,))
 	return jsonify(rd)
 
-@query.route('/get_document_tracking_cosponsor', methods = ['POST','GET'])
+@query.route('/get_document_tracking_cosponsor', methods=['POST','GET'])
 @login_required
 def get_document_tracking_cosponsor():
-	p=json.loads(request.data)
-	sel= """
-		select * from tbl_document_tracking_cosponsor where track_gen_id='"""+str(p['track_gen_id'])+"""'
+	p = json.loads(request.data)
+	
+	# Validate input
+	track_gen_id = validate_int(p.get('track_gen_id', 0))
+	
+	if track_gen_id <= 0:
+		return jsonify({"error": "Invalid track_gen_id"}), 400
+	
+	# Use parameterized query to prevent SQL injection
+	sel = """
+		SELECT * FROM tbl_document_tracking_cosponsor WHERE track_gen_id=%s
 	"""
-	rd=pyread(sel)
+	rd = pyread_safe(sel, (track_gen_id,))
 	return jsonify(rd)
 
 
@@ -9901,9 +10592,10 @@ def get_document_tracking_cosponsor():
 def reffer_back_document():
 	p=json.loads(request.data)
 	insert = """
-		insert into tbl_document_tracking_status set date=now(), status='Reffered back', track_gen_id='"""+str(p['track_gen_id'])+"""'
+		insert into tbl_document_tracking_status set date=now(), status='Reffered back', track_gen_id=%s
 	"""
-	cud(insert)
+	insert_params = [str(p['track_gen_id'])]
+	cud_safe(insert, insert_params)
 	return jsonify("Success")
 
 
@@ -9921,8 +10613,9 @@ def get_codification_ordinance():
 				from tbl_ordinance tbo
 				left join tbl_ordinance_status_numbers tosn on tbo.ordinance_id=tosn.ordinance_id
 				left join tbl_category tc on tc.category_id=tbo.category
-				where tbo.category='"""+str(p['category'])+"""'
+				where tbo.category=%s
 			"""
+			sel_params = [str(p['category'])]
 		else:
 			sel="""
 				select tbo.ordinance_number , tbo.date_enacted, tbo.ordinance_title,
@@ -9932,6 +10625,7 @@ def get_codification_ordinance():
 				left join tbl_ordinance_status_numbers tosn on tbo.ordinance_id=tosn.ordinance_id
 				left join tbl_category tc on tc.category_id=tbo.category
 			"""
+			sel_params = []
 		
 	elif p['status']==2:
 		if "category" in p and p['category']!="":
@@ -9942,8 +10636,9 @@ def get_codification_ordinance():
 				from tbl_ordinance tbo
 				left join tbl_ordinance_status_numbers tosn on tbo.ordinance_id=tosn.ordinance_id
 				left join tbl_category tc on tc.category_id=tbo.category
-				where (tosn.original=1 or tosn.ammended_no!='') and tbo.category='"""+str(p['category'])+"""'
+				where (tosn.original=1 or tosn.ammended_no!='') and tbo.category=%s
 			"""
+			sel_params = [str(p['category'])]
 		else:
 			sel="""
 				select tbo.ordinance_number , tbo.date_enacted, tbo.ordinance_title,
@@ -9954,6 +10649,7 @@ def get_codification_ordinance():
 				left join tbl_category tc on tc.category_id=tbo.category
 				where (tosn.original=1 or tosn.ammended_no!='')
 			"""
+			sel_params = []
 	else:
 		if "category" in p and p['category']!="":
 			sel="""
@@ -9963,8 +10659,9 @@ def get_codification_ordinance():
 				from tbl_ordinance tbo
 				left join tbl_ordinance_status_numbers tosn on tbo.ordinance_id=tosn.ordinance_id
 				left join tbl_category tc on tc.category_id=tbo.category
-				where (repealed_no!='' or obsolet_ord!='') and tbo.category='"""+str(p['category'])+"""'
+				where (repealed_no!='' or obsolet_ord!='') and tbo.category=%s
 			"""
+			sel_params = [str(p['category'])]
 		else:
 			sel="""
 				select tbo.ordinance_number , tbo.date_enacted, tbo.ordinance_title,
@@ -9975,7 +10672,8 @@ def get_codification_ordinance():
 				left join tbl_category tc on tc.category_id=tbo.category
 				where (repealed_no!='' or obsolet_ord!='')
 			"""
-	rd=pyread(sel)
+			sel_params = []
+	rd=pyread_safe(sel, sel_params)
 	return jsonify(rd)
 
 
@@ -9989,3 +10687,200 @@ def get_access_role():
 	args=(str(p['login_id']),)
 	rd=rd_query(sel,args)
 	return jsonify(rd)
+
+
+# ============================================================
+# SESSION VIDEO CONFIGURATION
+# Global video settings (Intro, Pambansang Awit, Opening Prayer)
+# ============================================================
+
+@query.route('/get_session_video_config', methods=['GET', 'POST'])
+@login_required
+def get_session_video_config():
+	"""Get global session video configuration"""
+	try:
+		# First check if columns exist to avoid recursion on missing columns
+		check_columns = """
+			SELECT COLUMN_NAME 
+			FROM INFORMATION_SCHEMA.COLUMNS 
+			WHERE TABLE_SCHEMA = 'sangunian_db_2' 
+			AND TABLE_NAME = 'tbl_config_info' 
+			AND COLUMN_NAME LIKE '%video_path%'
+		"""
+		columns_check = pyread(check_columns)
+		
+		if not columns_check or len(columns_check) < 3:
+			# Columns don't exist yet - migration not run
+			return jsonify({
+				"status": "error",
+				"message": "Database migration not run yet. Please run: run_migration.bat",
+				"data": None
+			})
+		
+		# Columns exist, proceed with query
+		sel = """
+			SELECT 
+				config_info_id,
+				national_anthem_path,
+				intro_video_path,
+				opening_prayer_path,
+				closing_prayer_path,
+				pledge_video_path
+			FROM tbl_config_info
+			LIMIT 1
+		"""
+		rd = pyread(sel)
+		
+		if not rd or len(rd) == 0:
+			# Return empty config if none exists
+			return jsonify({
+				"status": "success",
+				"data": {
+					"config_info_id": 0,
+					"national_anthem_path": None,
+					"intro_video_path": None,
+					"opening_prayer_path": None,
+					"closing_prayer_path": None,
+					"pledge_video_path": None
+				}
+			})
+		
+		return jsonify({
+			"status": "success",
+			"data": rd[0]
+		})
+	except Exception as e:
+		print(f"Error getting session video config: {e}")
+		import traceback
+		traceback.print_exc()
+		return jsonify({
+			"status": "error", 
+			"message": "Please run database migration first: run_migration.bat",
+			"error": str(e)
+		}), 500
+
+
+@query.route('/save_session_video_config', methods=['POST'])
+@login_required
+def save_session_video_config():
+	"""Save global session video configuration"""
+	try:
+		# Get config ID
+		sel_config = "SELECT config_info_id FROM tbl_config_info LIMIT 1"
+		config = pyread(sel_config)
+		
+		if not config or len(config) == 0:
+			# Create config if doesn't exist
+			insert = "INSERT INTO tbl_config_info (city_name) VALUES ('Default')"
+			config_id = cud_callbackid(insert)
+		else:
+			config_id = config[0]['config_info_id']
+		
+		# Initialize paths
+		video_paths = {
+			'intro': None,
+			'national_anthem': None,
+			'opening_prayer': None,
+			'closing_prayer': None
+		}
+		
+		# Handle file uploads
+		for filename_array in request.files:
+			file = request.files[filename_array]
+			video_type = filename_array.split("[")[0]
+			
+			if video_type in video_paths and file and allowed_file(file.filename):
+				# Save to config-specific directory
+				n_path = Path(__file__).parent / "../static/config_videos" / video_type
+				n_path = n_path.resolve()
+				
+				# Create directory if not exists
+				os.makedirs(n_path, exist_ok=True)
+				
+				filename = custom_secure_filename(file.filename)
+				app.config['UPLOAD_FOLDER'] = n_path
+				file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+				
+				# Store path
+				path_location = f"config_videos\\\\{video_type}\\\\{filename}"
+				video_paths[video_type] = path_location
+		
+		# Update database
+		update_parts = []
+		params = []
+		
+		if video_paths['national_anthem']:
+			update_parts.append("national_anthem_path=%s")
+			params.append(video_paths['national_anthem'])
+		
+		if video_paths['intro']:
+			update_parts.append("intro_video_path=%s")
+			params.append(video_paths['intro'])
+		
+		if video_paths['opening_prayer']:
+			update_parts.append("opening_prayer_video_path=%s")
+			params.append(video_paths['opening_prayer'])
+		
+		if video_paths['closing_prayer']:
+			update_parts.append("closing_prayer_video_path=%s")
+			params.append(video_paths['closing_prayer'])
+		
+		if update_parts:
+			params.append(config_id)
+			update = f"""
+				UPDATE tbl_config_info 
+				SET {', '.join(update_parts)}
+				WHERE config_info_id=%s
+			"""
+			result = cud_safe(update, tuple(params))
+			
+			if result != "200":
+				return jsonify({"error": "Failed to save configuration"}), 500
+		
+		return jsonify({"message": "Configuration saved successfully"})
+	
+	except Exception as e:
+		print(f"Error saving session video config: {e}")
+		return jsonify({"error": str(e)}), 500
+
+
+@query.route('/delete_session_video_config', methods=['POST'])
+@login_required
+def delete_session_video_config():
+	"""Delete a specific video from config"""
+	try:
+		p = json.loads(request.data)
+		video_type = validate_string(p.get('video_type', ''), 50)
+		
+		# Validate video type
+		column_map = {
+			'national_anthem': 'national_anthem_path',
+			'intro': 'intro_video_path',
+			'opening_prayer': 'opening_prayer_video_path',
+			'closing_prayer': 'closing_prayer_video_path'
+		}
+		
+		if video_type not in column_map:
+			return jsonify({"error": "Invalid video type"}), 400
+		
+		column = column_map[video_type]
+		
+		# Get current path to delete file
+		# `column` comes from the fixed column_map above (never from user input), and identifiers cannot be bound as parameters
+		sel = f"SELECT {column} FROM tbl_config_info LIMIT 1"
+		rd = pyread(sel)
+		
+		if rd and rd[0].get(column):
+			file_path = Path(__file__).parent / "../static" / rd[0][column]
+			if file_path.exists():
+				os.remove(file_path)
+		
+		# Clear from database
+		update = f"UPDATE tbl_config_info SET {column}=NULL"
+		cud(update)
+		
+		return jsonify({"message": "Video deleted successfully"})
+	
+	except Exception as e:
+		print(f"Error deleting session video: {e}")
+		return jsonify({"error": str(e)}), 500

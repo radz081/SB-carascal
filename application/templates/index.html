@@ -38,6 +38,26 @@
 </head>
 
 <style type="text/css">
+    /* anything clickable shows the hand cursor (links without href, onclick elements, sidebar menu items) */
+    a[onclick], [onclick], .sidebar a, .sidebar .nav-link, .sidebar-default .nav-link, .nav-link, button, .btn, #i_albums{
+        cursor: pointer;
+    }
+    button:disabled, .btn:disabled, .btn.disabled, .disabledbutton{
+        cursor: not-allowed;
+    }
+
+    /* compact top banner */
+    .sidebar + .main-content .iq-navbar-header{ height: 165px !important; }
+    .sidebar + .main-content .iq-navbar-header .iq-container{ padding: 1.4rem 2rem 1rem 2rem !important; }
+    .sidebar + .main-content .iq-navbar-header .iq-container h1{ font-size: 1.6rem; margin-bottom: .15rem; line-height: 1.2; }
+    .sidebar + .main-content .iq-navbar-header .iq-container h3{ font-size: 1rem; font-weight: 500; margin-bottom: 0; opacity: .9; }
+    .sidebar + .main-content .iq-navbar-header .iq-header-img{ height: 165px !important; }
+    .iq-navbar-header #city_mission{ display: none; }
+    .conatiner-fluid.content-inner{ margin-top: -3rem !important; }
+
+    .sidebar-search{ padding: 0 12px 10px 12px; position: sticky; top: 0; z-index: 5; background: inherit; }
+    .sidebar-mini .sidebar-search{ display: none; }
+
     .form-control{
         border-color: gray!important
     }
@@ -84,6 +104,11 @@
             <div class="sidebar-list">
                 <!-- Sidebar Menu Start -->
                 <input type="text" hidden id="active_sp_id">
+
+                <div class="sidebar-search">
+                    <input type="search" id="sidebar_search" class="form-control form-control-sm" placeholder="Search menu..." autocomplete="off" aria-label="Search menu">
+                    <div id="sidebar_search_empty" class="text-muted small" style="display:none;padding:8px 4px;">No menu found</div>
+                </div>
 
                 <ul class="navbar-nav iq-main-menu" id="sidebar-menu" style="margin-bottom: 50px;"></ul>
                 <!-- Sidebar Menu End -->        
@@ -241,6 +266,10 @@
 
                 <div id="announcement_navigation" style="display: none">
                     {% include 'config/announcement.html' %}
+                </div>
+
+                <div id="session_videos_navigation" style="display: none">
+                    {% include 'config/session_videos.html' %}
                 </div>
 
                 <div id="governance_classification_navigation" style="display: none">
@@ -1743,6 +1772,20 @@
 
     <!-- Modal -->
 
+    <div id="div_minutes_report_modal" class="modal fade" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-fullscreen">
+            <div class="modal-content form-control">
+                <div class="modal-header">
+                    <h5 class="modal-title">Minutes Report</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    {% include 'reports/minutes_report.html'%}
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div id="div_inventory_ordinances_modal" class="modal fade" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-fullscreen">
             <div class="modal-content form-control">
@@ -2733,6 +2776,7 @@
           { id: "sangunian", label: "Legislature", onclick: "clickNav('sangunian_navigation','sangunian')" , routes: "/sangunian"},
           { id: "li_assign", label: "Assign Councilor", onclick: "clickNav('assign_navigation','li_assign')" },
           { id: "li_announcement", label: "Announcement", onclick: "clickNav('announcement_navigation','li_announcement')" , routes: "/announcement"},
+          { id: "li_session_videos", label: "Session Videos", onclick: "clickNav('session_videos_navigation','li_session_videos')", routes: "/session_video_config" },
           { id: "li_governance_classification", label: "Governance", onclick: "clickNav('governance_classification_navigation','li_governance_classification')", routes: "/governance_classification" },
           { id: "li_category", label: "Category", onclick: "clickNav('category_navigation','li_category')", routes: "/category" },
           { id: "li_gmail", label: "Gmail Account", onclick: "clickNav('gmail_navigation','li_gmail')", routes : "/gmail_account"},
@@ -3005,6 +3049,75 @@
         }
         }
 
+    // ---- sidebar search: filters the rendered menu (works with the role-based menu as well) ----
+    (function(){
+        const input = document.getElementById('sidebar_search');
+        const empty = document.getElementById('sidebar_search_empty');
+        if(!input) return;
+
+        const text = (el) => (el ? el.textContent : '').toLowerCase().replace(/\s+/g, ' ').trim();
+
+        function resetMenu(){
+            document.querySelectorAll('#sidebar-menu li').forEach(li => { li.style.display = ''; });
+            document.querySelectorAll('#sidebar-menu .sub-nav.collapse.shown-by-search').forEach(ul => {
+                ul.classList.remove('show', 'shown-by-search');
+            });
+            empty.style.display = 'none';
+        }
+
+        function filterMenu(){
+            const q = input.value.toLowerCase().trim();
+            if(!q){ resetMenu(); return; }
+
+            let found = 0;
+            const items = document.querySelectorAll('#sidebar-menu > li');
+            items.forEach(li => {
+                const sub = li.querySelector('.sub-nav');
+                const header = li.classList.contains('static-item') || li.querySelector('hr');
+
+                if(header){ li.style.display = 'none'; return; }
+
+                if(sub){
+                    const parentMatch = text(li.querySelector(':scope > a .item-name')).includes(q);
+                    let childHits = 0;
+                    sub.querySelectorAll(':scope > li').forEach(sli => {
+                        const hit = parentMatch || text(sli).includes(q);
+                        sli.style.display = hit ? '' : 'none';
+                        if(hit) childHits++;
+                    });
+                    if(childHits){
+                        li.style.display = '';
+                        sub.classList.add('show', 'shown-by-search');
+                        found += childHits;
+                    }else{
+                        li.style.display = 'none';
+                        sub.classList.remove('show', 'shown-by-search');
+                    }
+                }else{
+                    const hit = text(li).includes(q);
+                    li.style.display = hit ? '' : 'none';
+                    if(hit) found++;
+                }
+            });
+            empty.style.display = found ? 'none' : 'block';
+        }
+
+        input.addEventListener('input', filterMenu);
+        input.addEventListener('keydown', function(e){
+            if(e.key === 'Escape'){ input.value = ''; filterMenu(); }
+            if(e.key === 'Enter'){
+                // open the first visible match
+                const first = Array.from(document.querySelectorAll('#sidebar-menu a[onclick], #sidebar-menu a[href]:not([href="#"])'))
+                    .find(a => a.offsetParent !== null && !a.hasAttribute('data-bs-toggle'));
+                if(first) first.click();
+            }
+        });
+
+        // when the menu is re-rendered (login/role load), re-apply the current search
+        const menu = document.getElementById('sidebar-menu');
+        new MutationObserver(function(){ if(input.value) filterMenu(); }).observe(menu, {childList: true});
+    })();
+
     const role = "{{data.role}}";
     const loginId = "{{data.login_id}}";
 
@@ -3097,6 +3210,41 @@
         getbyId('total_memorandom').innerHTML=`${count_documents.memorandom.total}&nbsp;${count_documents.memorandom.total < 2 ? 'Doc' : 'Docs'}&nbsp;`
 
 
+        // Home overview
+        const _docs = (o) => o.total
+        getbyId('home_total_ordinance').innerHTML = _docs(count_documents.ordinance)
+        getbyId('home_total_resolution').innerHTML = _docs(count_documents.resolution)
+        getbyId('home_total_petition').innerHTML = _docs(count_documents.petition)
+        getbyId('home_total_minutes').innerHTML = _docs(count_documents.minutes)
+        getbyId('home_total_memorandom').innerHTML = _docs(count_documents.memorandom)
+        getbyId('home_user').textContent = "{{ data.fullname if data else '' }}"
+        const _activeSp = (get_sp_active || []).find(sp => sp.status === 'ACTIVE')
+        if(_activeSp){ getbyId('home_sp_title').textContent = _activeSp.sp_title }
+        if(get_city_name[0]){
+            getbyId('home_city').textContent = get_city_name[0].city_name || ''
+            getbyId('home_province').textContent = get_city_name[0].province ? ', ' + get_city_name[0].province : ''
+        }
+        const _councilors = get_all_active_councilor || []
+        getbyId('home_councilor_count').textContent = _councilors.length
+        const _ul = getbyId('home_councilors')
+        _ul.innerHTML = ''
+        _councilors.forEach(c => {
+            const name = (c.fullname || '').replace(/\s+/g, ' ').trim()
+            const initials = name.split(' ').filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase()
+            const li = document.createElement('li')
+            const av = document.createElement('span')
+            av.className = 'hv-avatar'
+            av.textContent = initials
+            const nm = document.createElement('span')
+            nm.textContent = name
+            li.appendChild(av)
+            li.appendChild(nm)
+            _ul.appendChild(li)
+        })
+        if(!_councilors.length){ _ul.innerHTML = '<li class="text-muted">No active councilors</li>' }
+        getbyId('home_committee_count').textContent = (get_committee || []).length
+        getbyId('home_pending_count').textContent = (get_document_tracking_not_approved || []).length
+
         var type = ""
         if(get_city_name[0]){
             if(get_city_name[0].type==null || get_city_name[0].type=="" || get_city_name[0].type==0 || get_city_name[0].type=="0" || get_city_name[0].type=="on"){
@@ -3178,19 +3326,23 @@
         const $category3 = $('#sel_ordinance_category')
         const $category4 = $('#category_adopted_res_report')
         const $category5 = $('#category_enacted_ord_report')
+        const $categoryRes = $('#sel_ordinance_category_res')
         
         $category.empty().append(`<option value="" disabled selected>--SELECT--</option>`);
         $category2.empty().append(`<option value="" disabled selected>--SELECT--</option>`);
         $category3.empty().append(`<option value="" disabled selected>--SELECT--</option>`);
         $category4.empty().append(`<option value="" disabled selected>--SELECT--</option>`);
         $category5.empty().append(`<option value="" disabled selected>--SELECT--</option>`);
+        $categoryRes.empty();
         get_category.forEach(category => {
             $category.append(`<option value="${category.category_id}">${category.title}</option>`);
             $category2.append(`<option value="${category.category_id}">${category.title}</option>`);
-            $category2.append(`<option value="${category.category_id}">${category.title}</option>`);
+            $category3.append(`<option value="${category.category_id}">${category.title}</option>`);
+            $categoryRes.append(`<option value="${category.category_id}">${category.title}</option>`);
             $category4.append(`<option value="${category.category_id}">${category.title}</option>`);
             $category5.append(`<option value="${category.category_id}">${category.title}</option>`);
         })
+        $categoryRes.trigger('chosen:updated');
        
 
         setTimeout(()=>{
@@ -3220,7 +3372,7 @@
             'home_navigation', 'session_navigation', 'document_tracking_navigation',
             'sangunian_navigation', 'committee_navigation', 'committee_reports_navigation' ,'approved_ord_navigation',
             'appropriation_navigation', 'resolution_navigation', 'minutes_navigation', 'reports_navigation',
-            'assign_navigation', 'announcement_navigation', 'governance_classification_navigation',
+            'assign_navigation', 'announcement_navigation', 'session_videos_navigation', 'governance_classification_navigation',
             'category_navigation', 'gmail_navigation', 'info_navigation', 'barangay_navigation', 'user_navigation',
             'accounts_navigation', 'executive_order_navigation', 'memorandom_navigation', 'documents_refferals_navigation', 'citezen_charter_navigation', 'rules_and_procedure_navigation',
             'sp_budget_navigation', 'capital_outlay_navigation', 'sp_member_deduction_navigation',

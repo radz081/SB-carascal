@@ -1,11 +1,7 @@
-from flask import redirect, url_for, render_template, request, jsonify, json, session, request
+from flask import redirect, url_for, render_template, request, jsonify, json, session
 from . import main
 from models.routes_database import *
-import smtplib
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
 from functools import wraps
-import shutil
 from pathlib import Path, PurePath
 
 imp_folders = [
@@ -71,7 +67,6 @@ def authorize(f):
 
 def get_access(lists):
 	current_route = request.url_rule
-	flag = False
 	for i in lists:
 		if str(i)==str(current_route):
 			return True
@@ -244,8 +239,8 @@ def gallery():
 	rd_album = pyread(sel_info)
 
 	for x in rd_album:
-		sel_album_gal = "select * from tbl_album_gallery_photo where gallery_id ='"+ str(x['gallery_id']) +"' "
-		rd_album_gallery = pyread(sel_album_gal)
+		sel_album_gal = "SELECT * FROM tbl_album_gallery_photo WHERE gallery_id=%s"
+		rd_album_gallery = pyread_safe(sel_album_gal, (x['gallery_id'],))
 		x['gallery'] = rd_album_gallery
 	return render_template('/landing_page/gallery.html', data = rd_album)
 
@@ -297,15 +292,21 @@ def logout():
 
 @main.route('/login')
 def logins():
+	# Create required upload directories if they don't exist
 	for i in imp_folders:
-		n_path = Path(__file__).parent / "../static/uploads/" / str(i)
-		n_path.resolve()
-		if not os.path.exists(n_path):
-			print("not exist")
-			os.mkdir(n_path)
-			print("folder "+ i +" created")
-		else:
-			pass
+		try:
+			n_path = Path(__file__).parent / "../static/uploads" / str(i)
+			n_path = n_path.resolve()
+			
+			# Use makedirs to create parent directories as needed
+			if not n_path.exists():
+				n_path.mkdir(parents=True, exist_ok=True)
+				print(f"✓ Created folder: {i}")
+			else:
+				print(f"✓ Folder exists: {i}")
+		except Exception as e:
+			print(f"✗ Error creating folder {i}: {e}")
+	
 	return render_template('auth/sign-in.html')
 
 @main.route('/sangunian', methods=['GET', 'POST'])
@@ -620,6 +621,12 @@ def background():
 	session_data=session['data']
 	return render_template('config/updload_background.html', data=session_data)
 
+
+@main.route('/session_video_config', methods=['GET', 'POST'])
+@authorize
+def session_video_config():
+	session_data=session['data']
+	return render_template('config/session_videos.html', data=session_data)
 
 
 @main.route('/gallery_albums', methods=['GET', 'POST'])

@@ -92,59 +92,25 @@
 			<textarea class="form-control" id="ordinance_title" name="ordinance_title" style="resize:vertical;height: 300px;"></textarea>
 
 
-			<div class="panel panel-default">
-			    <div class="panel-heading ">
-			    	<p class="ptop">Ordinance Author 
-			    		<span class="btn btn-sm btn-icon text-primary flex-end" onclick="add_ord_author()">
-			    			<svg width="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-			    				<path fill-rule="evenodd" clip-rule="evenodd" d="M9.5 12.5537C12.2546 12.5537 14.4626 10.3171 14.4626 7.52684C14.4626 4.73663 12.2546 2.5 9.5 2.5C6.74543 2.5 4.53737 4.73663 4.53737 7.52684C4.53737 10.3171 6.74543 12.5537 9.5 12.5537ZM9.5 15.0152C5.45422 15.0152 2 15.6621 2 18.2464C2 20.8298 5.4332 21.5 9.5 21.5C13.5448 21.5 17 20.8531 17 18.2687C17 15.6844 13.5668 15.0152 9.5 15.0152ZM19.8979 9.58786H21.101C21.5962 9.58786 22 9.99731 22 10.4995C22 11.0016 21.5962 11.4111 21.101 11.4111H19.8979V12.5884C19.8979 13.0906 19.4952 13.5 18.999 13.5C18.5038 13.5 18.1 13.0906 18.1 12.5884V11.4111H16.899C16.4027 11.4111 16 11.0016 16 10.4995C16 9.99731 16.4027 9.58786 16.899 9.58786H18.1V8.41162C18.1 7.90945 18.5038 7.5 18.999 7.5C19.4952 7.5 19.8979 7.90945 19.8979 8.41162V9.58786Z" fill="currentColor">
-			    				</path>                            
-			    			</svg> 
-			    		</span>
-			    	</p>
-			    </div>
-			    <div class="panel-body">
-			    	<div class="colfull" id="div_ordinance_author" style="padding:0px 20px 0px 20px">
-						
-					</div>
-			    </div>
+			<div class="row" style="margin-top: 10px;">
+				<div class="col-sm">
+					<label>Ordinance Author</label>
+					<select class="chosen-select" id="sel_ord_authors" multiple data-placeholder="--SELECT--"></select>
+				</div>
 			</div>
 
-			<div class="panel panel-default">
-			    <div class="panel-heading">
-			    	<p class="ptop" >Ordinance CO-Author 
-			    		<span class="btn btn-sm btn-icon text-primary flex-end" onclick="add_ord_co_author()">
-			    			<svg width="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-			    				<path fill-rule="evenodd" clip-rule="evenodd" d="M9.5 12.5537C12.2546 12.5537 14.4626 10.3171 14.4626 7.52684C14.4626 4.73663 12.2546 2.5 9.5 2.5C6.74543 2.5 4.53737 4.73663 4.53737 7.52684C4.53737 10.3171 6.74543 12.5537 9.5 12.5537ZM9.5 15.0152C5.45422 15.0152 2 15.6621 2 18.2464C2 20.8298 5.4332 21.5 9.5 21.5C13.5448 21.5 17 20.8531 17 18.2687C17 15.6844 13.5668 15.0152 9.5 15.0152ZM19.8979 9.58786H21.101C21.5962 9.58786 22 9.99731 22 10.4995C22 11.0016 21.5962 11.4111 21.101 11.4111H19.8979V12.5884C19.8979 13.0906 19.4952 13.5 18.999 13.5C18.5038 13.5 18.1 13.0906 18.1 12.5884V11.4111H16.899C16.4027 11.4111 16 11.0016 16 10.4995C16 9.99731 16.4027 9.58786 16.899 9.58786H18.1V8.41162C18.1 7.90945 18.5038 7.5 18.999 7.5C19.4952 7.5 19.8979 7.90945 19.8979 8.41162V9.58786Z" fill="currentColor">
-			    				</path>                            
-			    			</svg> 
-			    		</span>
-			    	</p>
-			    </div>
-			    <div class="panel-body">
-			    	<div class="colfull" id="div_ordinance_co_author" style="padding:0px 20px 0px 20px">
-						
-					</div>
-			    </div>
+			<div class="row" style="margin-top: 10px;">
+				<div class="col-sm">
+					<label>Ordinance CO-Author</label>
+					<select class="chosen-select" id="sel_ord_co_authors" multiple data-placeholder="--SELECT--"></select>
+				</div>
 			</div>
 
-
-			<div class="panel panel-default">
-			    <div class="panel-heading">
-			    	<p class="ptop">Ordinance Sponsor 
-			    		<span class="btn btn-sm btn-icon text-primary flex-end" onclick="add_ord_sponsor()">
-			    			<svg width="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-			    				<path fill-rule="evenodd" clip-rule="evenodd" d="M9.5 12.5537C12.2546 12.5537 14.4626 10.3171 14.4626 7.52684C14.4626 4.73663 12.2546 2.5 9.5 2.5C6.74543 2.5 4.53737 4.73663 4.53737 7.52684C4.53737 10.3171 6.74543 12.5537 9.5 12.5537ZM9.5 15.0152C5.45422 15.0152 2 15.6621 2 18.2464C2 20.8298 5.4332 21.5 9.5 21.5C13.5448 21.5 17 20.8531 17 18.2687C17 15.6844 13.5668 15.0152 9.5 15.0152ZM19.8979 9.58786H21.101C21.5962 9.58786 22 9.99731 22 10.4995C22 11.0016 21.5962 11.4111 21.101 11.4111H19.8979V12.5884C19.8979 13.0906 19.4952 13.5 18.999 13.5C18.5038 13.5 18.1 13.0906 18.1 12.5884V11.4111H16.899C16.4027 11.4111 16 11.0016 16 10.4995C16 9.99731 16.4027 9.58786 16.899 9.58786H18.1V8.41162C18.1 7.90945 18.5038 7.5 18.999 7.5C19.4952 7.5 19.8979 7.90945 19.8979 8.41162V9.58786Z" fill="currentColor">
-			    				</path>                            
-			    			</svg> 
-			    		</span>
-			    	</p>
-			    </div>
-			    <div class="panel-body">
-			    	<div class="colfull" id="div_ordinance_sponsor" style="padding:0px 20px 0px 20px">
-						
-					</div>
-			    </div>
+			<div class="row" style="margin-top: 10px;">
+				<div class="col-sm">
+					<label>Ordinance Sponsor</label>
+					<select class="chosen-select" id="sel_ord_sponsors" multiple data-placeholder="--SELECT--"></select>
+				</div>
 			</div>
 
 			<div class="row" hidden>
@@ -401,23 +367,9 @@
 		    var tx_description = tinymce.get('tx_description').getContent();
 		    form.description = tx_description
 
-		    if (form.input_authors) {
-		    	var new_data1 = form.input_authors.filter(function(item){
-			      	return item[0] != "";
-			    });
-		    }
-		    
-		    if (form.input_co_authors) {
-		    	var new_data2 = form.input_co_authors.filter(function(item){
-			      	return item[0] != "";
-			    });
-		    }
-		    
-		    if (form.input_sponsor) {
-		    	var new_data3 = form.input_sponsor.filter(function(item){
-			      	return item[0] != "";
-			    });
-		    }
+		    form.input_authors = $('#sel_ord_authors').val() || [];
+		    form.input_co_authors = $('#sel_ord_co_authors').val() || [];
+		    form.input_sponsor = $('#sel_ord_sponsors').val() || [];
 
 		    if(org_stat.checked==true){
 		    	form.original=1
@@ -593,173 +545,47 @@
 
 		getDataWithCallback('/get_info', function(res) {
 	        get_info = res
+	        fill_ord_people_options()
 	    })
 
 		get_gov_classification()
 		get_category();
 	})
 
-	var count_authors=0
-	function add_ord_author(callback){
-		var div =getbyId('div_ordinance_author')
+	var ord_people_selects = ['sel_ord_authors','sel_ord_co_authors','sel_ord_sponsors']
 
-		var div_gen=document.createElement("div")
-		var div_id='gendiv_authors'+count_authors
-		div_gen.id=div_id
-
-		var input=document.createElement('select')
-		input.style="height:33px!important;"
-		var inp_id='input_authors' + count_authors;
-		input.id=inp_id
-		input.name="input_authors["+count_authors+"]";
-
-		var option_blank = document.createElement("option");
-		option_blank.innerHTML = "--SELECT--"
-		option_blank.value = ""
-		option_blank.disabled = true
-		option_blank.selected = true
-
-		input.appendChild(option_blank);
-		get_info.forEach(function(i){
-			var option = document.createElement("option");
-			option.innerHTML = i['fullname'];
-			option.value = i['info_id'];
-			input.appendChild(option);
+	// fill the multi-selects with the councilors list (once the list is loaded)
+	function fill_ord_people_options(){
+		ord_people_selects.forEach(function(id){
+			var $sel=$('#'+id)
+			var current=$sel.val() || []
+			$sel.empty()
+			get_info.forEach(function(i){
+				$sel.append($('<option>').val(i['info_id']).text(i['fullname']))
+			})
+			$sel.val(current)
+			if(!$sel.next('.chosen-container').length){
+				$sel.chosen({width:"100%"})
+			}
+			$sel.trigger('chosen:updated')
 		})
-
-		var btn=document.createElement('button')
-		btn.setAttribute('class', "col5 btn btn-sm btn btn-outline-danger")
-		btn.style="float:right"
-		btn.type="button"
-		btn.innerHTML="X"
-		
-		btn.setAttribute('data-div',div_id)
-		btn.setAttribute('data-inp',inp_id);
-		btn.onclick = function() {
-			var id = this.getAttribute('data-div');
-			document.getElementById(id).remove();
-	    };
-		
-		div_gen.appendChild(input)
-		div_gen.appendChild(btn)
-
-		div.appendChild(div_gen)
-
-		$(input).chosen({width: "90%"})
-
-
-		count_authors++;
-		if(callback) {
-			callback(input)
-		}
 	}
 
-	var count_co_authors=0
-	function add_ord_co_author(callback){
-		var div =getbyId('div_ordinance_co_author')
-
-		var div_gen=document.createElement("div")
-		var div_id='gendiv_co_authors'+count_co_authors
-		div_gen.id=div_id
-
-		var input=document.createElement('select')
-		input.setAttribute('class', "col95")
-		var inp_id='inp_co_author' + count_co_authors;
-		input.id=inp_id
-		input.name="input_co_authors["+count_co_authors+"]";
-
-		var option_blank = document.createElement("option");
-		option_blank.innerHTML = "--SELECT--"
-		option_blank.value = ""
-		option_blank.disabled = true
-		option_blank.selected = true
-
-		input.appendChild(option_blank);
-		get_info.forEach(function(i){
-			var option = document.createElement("option");
-			option.innerHTML = i['fullname'];
-			option.value = i['info_id'];
-			input.appendChild(option);
-			
-		})
-
-		var btn=document.createElement('button')
-		btn.setAttribute('class', "col5 btn btn-sm btn btn-outline-danger")
-		btn.style="float:right"
-		btn.type="button"
-		btn.innerHTML="X"
-		
-		btn.setAttribute('data-div',div_id)
-		btn.setAttribute('data-inp',inp_id);
-		btn.onclick = function() {
-			var div=this.getAttribute('data-div');
-			document.getElementById(div).remove();
-	    };
-		
-		div_gen.appendChild(input)
-		div_gen.appendChild(btn)
-		div.appendChild(div_gen)
-
-	 	$(input).chosen({width: "90%"})
-	 	count_co_authors++;
-	    if(callback) {
-			callback(input)
-		}
+	// used by the open handlers: set the selected people for one of the selects
+	function set_ord_people(id, values){
+		$('#'+id).val(values.filter(function(v){ return v !== null && v !== "" })).trigger('chosen:updated')
 	}
 
-
-	var count_sponsor=0
-	function add_ord_sponsor(callback){
-		var div =getbyId('div_ordinance_sponsor')
-
-		var div_gen=document.createElement("div")
-		var div_id='gendiv_sponsor'+count_sponsor
-		div_gen.id=div_id
-
-		var input=document.createElement('select')
-		input.setAttribute('class', "col95")
-		var inp_id='inp_sponsor' + count_sponsor;
-		input.id=inp_id
-		input.name="input_sponsor["+count_sponsor+"]";
-
-		var option_blank = document.createElement("option");
-		option_blank.innerHTML = "--SELECT--"
-		option_blank.value = ""
-		option_blank.disabled = true
-		option_blank.selected = true
-
-		input.appendChild(option_blank);
-		get_info.forEach(function(i){
-			var option = document.createElement("option");
-			option.innerHTML = i['fullname'];
-			option.value = i['info_id'];
-			input.appendChild(option);
-			
+	function reset_ordinance_people(){
+		ord_people_selects.forEach(function(id){
+			$('#'+id).val([]).trigger('chosen:updated')
 		})
-
-		var btn=document.createElement('button')
-		btn.setAttribute('class', "col5 btn btn-sm btn btn-outline-danger")
-		btn.style="float:right"
-		btn.type="button"
-		btn.innerHTML="X"
-		
-		btn.setAttribute('data-div',div_id)
-		btn.setAttribute('data-inp',inp_id);
-		btn.onclick = function() {
-			var div=this.getAttribute('data-div');
-			document.getElementById(div).remove();
-	    };
-		
-		div_gen.appendChild(input)
-		div_gen.appendChild(btn)
-		div.appendChild(div_gen)
-
-	    $(input).chosen({width: "90%"})
-	    count_sponsor++;
-	    if(callback) {
-			callback(input)
-		}
 	}
+
+	// whichever page opened the modal, never carry selections over to the next time it opens
+	$(document).on('hidden.bs.modal', '#div_add_ordinance', function(){
+		reset_ordinance_people()
+	})
 
 	function specify_source(){
 		var typ=getbyId('sel_source_docs').value
@@ -863,6 +689,7 @@
 	}
 
 	function clear_ordinance(){
+		reset_ordinance_people()
 		getbyId('h_ordinance_id').value = "0";
 		getbyId("h_sp_legislature").value = "";
 	}

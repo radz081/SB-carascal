@@ -1,0 +1,143 @@
+<div class="colfull" style="margin-top: 10px;">
+	<div class="container">
+		<form id="form_minutes_report">
+			<div class="row">
+				<div class="col-sm">
+					<label>Period From</label>
+					<input class="form-control" type="date" id="inp_from_minutes_report">
+				</div>
+				<div class="col-sm">
+					<label>Period To</label>
+					<input class="form-control" type="date" id="inp_to_minutes_report">
+				</div>
+			</div>
+			<div class="row">
+				<div class="col-sm">
+					<label>Term</label>
+					<select class="form-control" id="sel_term_minutes_report"></select>
+				</div>
+				<div class="col-sm">
+					<label>Type of Session</label>
+					<select class="form-control" id="sel_type_minutes_report">
+						<option value="" selected>ALL</option>
+						<option value="REGULAR">REGULAR</option>
+						<option value="SPECIAL">SPECIAL</option>
+						<option value="JOINT">JOINT</option>
+					</select>
+				</div>
+			</div>
+			<div class="col10" style="margin-top: 20px!important">
+				<button type="submit" class="btn btn-success">OK</button>
+				<button type="button" class="btn btn-default shadow" onclick="clear_minutes_report()">CLEAR</button>
+				<button type="button" class="btn btn-primary" onclick="print_custom('print_minutes_report')">Print</button>
+			</div>
+		</form>
+	</div>
+</div>
+
+<div class="container">
+	<div class="colfull" style="padding: 30px;" id="print_minutes_report">
+		<div class="colfull fl">
+			<div class="col20">
+				<img id="img_minutes_report_city_logo" src="static/icon/your_logo.png" style="height: 100px;width: 100px;">
+			</div>
+			<div class="col60" style="position: relative;top: -100px">
+				<div style="width: 60%;margin: 0 auto;" align="center">
+					<p style="text-align: center;">Republic of the Philippines</p>
+					<p>Province of <span id="minutes_report_province"></span></p>
+					<p><span id="minutes_report_location"></span> of <span id="minutes_report_city_name" style="text-transform:capitalize;"></span></p>
+				</div>
+			</div>
+		</div>
+		<div style="margin-top: -80px">
+			<div class="colfull fl" align="center">
+				<p style="font-size:18px;font-weight: bolder;">Minutes Report</p>
+				<p id="minutes_report_period"></p>
+			</div>
+			<div class="colfull" style="margin-top: 50px;">
+				<table id="tbl_minutes_report" class="colfull table_report table" border="1" style="width:100%">
+					<thead>
+						<th>Session #</th>
+						<th>Term</th>
+						<th>Type</th>
+						<th>Date</th>
+					</thead>
+					<tbody id="tbody_minutes_report"></tbody>
+				</table>
+			</div>
+			<div class="colfull" style="margin-top: 30px;">
+				<div class="col50">
+					<div class="col30"><p style="font-size: 15px;">Prepared by:</p></div>
+					<div class="col20">
+						<p style="border-bottom: 1px solid black;width: 250px!important" contenteditable="true"></p>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+
+<script type="text/javascript">
+	var minutes_report_data = []
+
+	$(document).ready(function(){
+		$('#form_minutes_report').submit(function(e){
+			e.preventDefault()
+			render_minutes_report()
+		})
+	})
+
+	function load_minutes_report(){
+		getDataWithCallback('/get_sp', function(terms){
+			var sel = getbyId('sel_term_minutes_report')
+			sel.innerHTML = '<option value="" selected>ALL</option>'
+			terms.forEach(function(t){
+				var o = document.createElement('option')
+				o.value = t.sp_id
+				o.textContent = t.sp_title
+				sel.appendChild(o)
+			})
+			getDataWithCallback('/get_minutes', function(res){
+				minutes_report_data = res || []
+				render_minutes_report()
+			})
+		})
+	}
+
+	function render_minutes_report(){
+		var from = getbyId('inp_from_minutes_report').value
+		var to = getbyId('inp_to_minutes_report').value
+		var term = getbyId('sel_term_minutes_report').value
+		var type = getbyId('sel_type_minutes_report').value
+
+		var rows = minutes_report_data.filter(function(m){
+			var d = String(m.date || '').substring(0, 10)
+			return (!term || String(m.sp_id) === term)
+				&& (!type || m.type === type)
+				&& (!from || d >= from)
+				&& (!to || d <= to)
+		})
+
+		var tbody = getbyId('tbody_minutes_report')
+		tbody.innerHTML = ''
+		if (!rows.length) {
+			tbody.innerHTML = '<tr><td colspan="4" align="center">No data available</td></tr>'
+		}
+		rows.forEach(function(m){
+			var tr = document.createElement('tr')
+			;[m.minutes_no, m.sp_title, m.type, String(m.date || '').substring(0, 10)].forEach(function(v){
+				var td = document.createElement('td')
+				td.textContent = v == null ? '' : v
+				tr.appendChild(td)
+			})
+			tbody.appendChild(tr)
+		})
+
+		getbyId('minutes_report_period').textContent = (from || to) ? ('for the period ' + (from || '...') + ' to ' + (to || '...')) : ''
+	}
+
+	function clear_minutes_report(){
+		getbyId('form_minutes_report').reset()
+		render_minutes_report()
+	}
+</script>

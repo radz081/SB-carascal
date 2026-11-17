@@ -169,7 +169,10 @@
 
 			btn_view.onclick=function(){
 				localStorage.setItem("gallery_id", i.gallery_id);
-				// window.location.href="/albums"
+				// clear the previously opened album and load the selected one right away
+				getbyId('div_gallery_images').innerHTML=""
+				getbyId('title_gallery').innerHTML=i.album_name
+				get_gallery_images(i.gallery_id)
 				getbyId('albums_navigation').style.display="block"
 				getbyId('gallery_albums_').style.display="none"
 

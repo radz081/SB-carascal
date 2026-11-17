@@ -13,18 +13,6 @@ let get_source_document=[]
 let role_specific_access = []
 
 let get_category = []
-function fetchDataForm(url,data) {
-    return new Promise((resolve, reject) => {
-        sendDataWithCallback(url,data,function(res){
-            if (res) {
-                resolve(res);
-            } else {
-                reject(`Failed to fetch data from ${url}`);
-            }
-        })
-    });
-}
-
 function fetchData(url) {
     return new Promise((resolve, reject) => {
         getDataWithCallback(url, function(res) {

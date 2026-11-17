@@ -90,7 +90,10 @@
 	function get_gallery_images(x){
 		sendDataWithCallback("/get_gallery_images",{gallery_id:x},function(res){
 			if(res){
-				if(res[0]){
+				if(!res[0]){
+						getbyId('div_gallery_images').innerHTML=""
+					}
+					if(res[0]){
 					getbyId('title_gallery').innerHTML=res[0].album_name
 					getbyId('div_gallery_images').innerHTML=""
 					var div_parent=getbyId('div_gallery_images')

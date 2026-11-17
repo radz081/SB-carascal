@@ -43,15 +43,29 @@
                     <div id="collapse_intro2" class="collapse">
                         <div class="card card-body">
                             <div class="col-md-12">
-                              <div class="video-list">
-                                <ul>
-    
-                                </ul>
-                              </div>
-                            </div>
-                            <div class="col-sm">
-                                <input type="file" id="intro_video" name="intro_video" class="form-control d-none" accept=" video/*" />
-                                <button type="button" class="btn btn-secondary" id="intro_videoBtn">Import Your Video<i class="fa fa-camera"></i> </button>
+                                <!-- Display configured video from global config -->
+                                <div id="intro_config_preview" class="mb-3">
+                                    <div class="alert alert-info">
+                                        <i class="fa fa-video-camera"></i> <strong>Using configured intro video</strong>
+                                        <div id="intro_video_display" class="mt-2"></div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Optional: Allow override with custom video -->
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="checkbox" id="override_intro_video" onchange="toggleVideoUpload('intro')">
+                                    <label class="form-check-label" for="override_intro_video">
+                                        Use custom video for this session (optional)
+                                    </label>
+                                </div>
+                                
+                                <div id="intro_upload_section" style="display:none;">
+                                    <div class="video-list">
+                                        <ul></ul>
+                                    </div>
+                                    <input type="file" id="intro_video" name="intro_video" class="form-control d-none" accept="video/*" />
+                                    <button type="button" class="btn btn-secondary btn-sm" id="intro_videoBtn">Upload Custom Video <i class="fa fa-camera"></i></button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -80,15 +94,31 @@
                     <div id="collapse_nation_anthem2" class="collapse">
                         <div class="card card-body">
                             <div class="col-md-12">
-                              <div class="video-list1">
-                                <ul></ul>
-                              </div>
+                                <!-- Display configured video from global config -->
+                                <div id="national_anthem_config_preview" class="mb-3">
+                                    <div class="alert alert-info">
+                                        <i class="fa fa-video-camera"></i> <strong>Using configured national anthem video</strong>
+                                        <div id="national_anthem_video_display" class="mt-2"></div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Optional: Allow override with custom video -->
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="checkbox" id="override_national_anthem_video" onchange="toggleVideoUpload('national_anthem')">
+                                    <label class="form-check-label" for="override_national_anthem_video">
+                                        Use custom video for this session (optional)
+                                    </label>
+                                </div>
+                                
+                                <div id="national_anthem_upload_section" style="display:none;">
+                                    <div class="video-list1">
+                                        <ul></ul>
+                                    </div>
+                                    <input type="file" id="national_anthem_video" name="national_anthem_video" class="form-control d-none" accept="video/*" />
+                                    <button type="button" class="btn btn-secondary btn-sm" id="national_anthem_videoBtn">Upload Custom Video <i class="fa fa-camera"></i></button>
+                                </div>
                             </div>
-                            <div class="col-sm">
-                                <input type="file" id="national_anthem_video" name="national_anthem_video" class="form-control d-none" multiple="" accept=" video/*" />
-                                <button type="button" class="btn btn-secondary" id="national_anthem_videoBtn">Import Your Video<i class="fa fa-camera"></i> </button>
-                            </div>
-                            <div class="col-sm">
+                            <div class="col-sm mt-3">
                                 <label for="">National Anthem Lead By:</label>
                                 <input class="form-control" type="text" autocomplete="off" name="national_anthem" id="national_anthem" list="councilor_list" autocomplete="off">
                             </div>
@@ -105,15 +135,29 @@
                       <div id="collapse_opening2" class="collapse">
                           <div class="card card-body">
                               <div class="col-md-12">
-                                <div class="video-list2">
-                                  <ul>
-      
-                                  </ul>
-                                </div>
-                              </div>
-                              <div class="col-sm">
-                                  <input type="file" id="prayer_video" name="prayer_video" class="form-control d-none" accept=" video/*" />
-                                  <button type="button" class="btn btn-secondary" id="prayer_videoBtn">Import Your Video<i class="fa fa-camera"></i> </button>
+                                  <!-- Display configured video from global config -->
+                                  <div id="opening_prayer_config_preview" class="mb-3">
+                                      <div class="alert alert-info">
+                                          <i class="fa fa-video-camera"></i> <strong>Using configured opening prayer video</strong>
+                                          <div id="opening_prayer_video_display" class="mt-2"></div>
+                                      </div>
+                                  </div>
+                                  
+                                  <!-- Optional: Allow override with custom video -->
+                                  <div class="form-check mb-2">
+                                      <input class="form-check-input" type="checkbox" id="override_prayer_video" onchange="toggleVideoUpload('prayer')">
+                                      <label class="form-check-label" for="override_prayer_video">
+                                          Use custom video for this session (optional)
+                                      </label>
+                                  </div>
+                                  
+                                  <div id="prayer_upload_section" style="display:none;">
+                                      <div class="video-list2">
+                                          <ul></ul>
+                                      </div>
+                                      <input type="file" id="prayer_video" name="prayer_video" class="form-control d-none" accept="video/*" />
+                                      <button type="button" class="btn btn-secondary btn-sm" id="prayer_videoBtn">Upload Custom Video <i class="fa fa-camera"></i></button>
+                                  </div>
                               </div>
                           </div>
                           <div class="card card-body">
@@ -395,6 +439,12 @@
 <script type="text/javascript">
     $(document).ready(function(){
         var form_id='#form_session2'
+        
+        // Load videos only when modal is shown (prevents recursion on page load)
+        $('#session_modal').on('shown.bs.modal', function () {
+            loadConfiguredVideos();
+        });
+        
         $(form_id).submit(function(e) {
             e.preventDefault();
             var form_save = $(form_id).serializeObject();
@@ -582,6 +632,120 @@
        </li>`
       $('.video-list2 ul').append(li);
     };
+
+    // Load configured videos from global configuration
+    function loadConfiguredVideos() {
+        $.ajax({
+            url: '/get_session_video_config',
+            type: 'POST',
+            timeout: 5000, // 5 second timeout to prevent hanging
+            success: function(response) {
+                if (response.status === 'error') {
+                    console.warn('Video config error:', response.message);
+                    // Show warning but don't break the form
+                    showVideoConfigWarning(response.message);
+                    return;
+                }
+                
+                if (response.status === 'success' && response.data) {
+                    const config = response.data;
+                    
+                    // Display Intro Video
+                    if (config.intro_video_path && config.intro_video_path !== 'None') {
+                        $('#intro_video_display').html(`
+                            <video controls width="320" height="180" class="mt-2">
+                                <source src="${config.intro_video_path}" type="video/mp4">
+                                Your browser does not support the video tag.
+                            </video>
+                        `);
+                        $('#intro_config_preview').show();
+                    } else {
+                        $('#intro_config_preview').html(`
+                            <div class="alert alert-warning">
+                                <i class="fa fa-exclamation-triangle"></i> No intro video configured. 
+                                <a href="/session_video_config" target="_blank">Configure now</a>
+                            </div>
+                        `);
+                    }
+                    
+                    // Display National Anthem Video
+                    if (config.national_anthem_path && config.national_anthem_path !== 'None') {
+                        $('#national_anthem_video_display').html(`
+                            <video controls width="320" height="180" class="mt-2">
+                                <source src="${config.national_anthem_path}" type="video/mp4">
+                                Your browser does not support the video tag.
+                            </video>
+                        `);
+                        $('#national_anthem_config_preview').show();
+                    } else {
+                        $('#national_anthem_config_preview').html(`
+                            <div class="alert alert-warning">
+                                <i class="fa fa-exclamation-triangle"></i> No national anthem video configured. 
+                                <a href="/session_video_config" target="_blank">Configure now</a>
+                            </div>
+                        `);
+                    }
+                    
+                    // Display Opening Prayer Video
+                    if (config.opening_prayer_path && config.opening_prayer_path !== 'None') {
+                        $('#opening_prayer_video_display').html(`
+                            <video controls width="320" height="180" class="mt-2">
+                                <source src="${config.opening_prayer_path}" type="video/mp4">
+                                Your browser does not support the video tag.
+                            </video>
+                        `);
+                        $('#opening_prayer_config_preview').show();
+                    } else {
+                        $('#opening_prayer_config_preview').html(`
+                            <div class="alert alert-warning">
+                                <i class="fa fa-exclamation-triangle"></i> No opening prayer video configured. 
+                                <a href="/session_video_config" target="_blank">Configure now</a>
+                            </div>
+                        `);
+                    }
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error('Error loading video config:', error);
+                // Fail gracefully - show warning but let form work
+                showVideoConfigWarning('Could not load video configuration. You can still upload videos manually.');
+            }
+        });
+    }
+    
+    // Show warning message for video config issues
+    function showVideoConfigWarning(message) {
+        const warningHtml = `
+            <div class="alert alert-warning alert-dismissible fade show" role="alert">
+                <i class="fa fa-exclamation-triangle"></i> <strong>Video Configuration:</strong> ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        `;
+        // Show warnings in each section
+        $('#intro_config_preview').html(warningHtml);
+        $('#national_anthem_config_preview').html(warningHtml);
+        $('#opening_prayer_config_preview').html(warningHtml);
+    }
+
+    // Toggle video upload sections
+    function toggleVideoUpload(videoType) {
+        const checkbox = document.getElementById(`override_${videoType}_video`);
+        const uploadSection = document.getElementById(`${videoType}_upload_section`);
+        const configPreview = document.getElementById(`${videoType}_config_preview`);
+        
+        if (checkbox.checked) {
+            uploadSection.style.display = 'block';
+            configPreview.style.display = 'none';
+        } else {
+            uploadSection.style.display = 'none';
+            configPreview.style.display = 'block';
+            // Clear the file input
+            const fileInput = document.getElementById(`${videoType}_video`);
+            if (fileInput) {
+                fileInput.value = '';
+            }
+        }
+    }
 
 
     function save_session_(form_data){

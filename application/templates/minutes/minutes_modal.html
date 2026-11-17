@@ -50,6 +50,11 @@
 		    </div>
 		</div> -->
 
+	    <div class="colfull fl" style="margin-bottom: 10px">
+	    	<p>Term</p>
+	    	<select class="form-control" id="inp_minutes_sp_id" name="sp_id" required></select>
+	    </div>
+
 	    <div class="colfull fl">
 	    	<p>Date</p>
 	    	<input class="form-control" type="date" id="inp_minutes_date" required>	
@@ -92,6 +97,24 @@
 <script type="text/javascript">
 	$(document).ready(function(res){
 		var form_id='#form_minutes'
+
+			getDataWithCallback('/get_sp',function(res){
+				var sel=getbyId('inp_minutes_sp_id')
+				sel.innerHTML='<option value="" disabled selected>--SELECT TERM--</option>'
+				res.forEach(function(t){
+					var o=document.createElement('option')
+					o.value=t.sp_id
+					o.textContent=t.sp_title
+					sel.appendChild(o)
+				})
+				set_minutes_term(getbyId('active_sp_id') ? getbyId('active_sp_id').value : "")
+			})
+
+			// start from a clean form whenever the modal is closed without saving
+			$('#div_minutes_modal').on('hidden.bs.modal', function(){
+				clear_minutes()
+			})
+
 		 $(form_id).submit(function(e){
 		 	var form_save = $(form_id).serializeObject();
 	        e.preventDefault();
@@ -120,7 +143,18 @@
 		
 	})
 
+    var minutes_saving=false
+
+    function set_minutes_term(sp_id){
+    	var sel=getbyId('inp_minutes_sp_id')
+    	if(sel){
+    		sel.value = sp_id ? String(sp_id) : ""
+    	}
+    }
+
     function upload_files_minutes(form_save){
+    	if(minutes_saving){ return }   // ignore double clicks / double submits
+    	minutes_saving=true
     	var mydata = new FormData();
         if(form_save.hasOwnProperty('inpt_movant')){
 
@@ -140,7 +174,7 @@
         mydata.append('minutes_no', getbyId('minutes_no').value);
         mydata.append('minutes_id',getbyId('h_minutes_id').value)
         mydata.append('',getbyId('h_minutes_committee_id').value)
-        mydata.append('sp_id',getbyId('active_sp_id').value)
+        mydata.append('sp_id',getbyId('inp_minutes_sp_id').value)
 
         jQuery.each($("#upload_file_minutes")[0].files, function(i, file) {
 	        mydata.append('file['+i+']', file);
@@ -161,15 +195,18 @@
 		       console.log(mydata)
 		    },
 	        success: function(res) {
-	        	clear_minutes()
+		        	minutes_saving=false
+		        	clear_minutes()
 				getbyId('form_minutes').reset()
 				$('#div_minutes_modal').modal('toggle');
 				$("#tbl_minutes").dataTable().fnDestroy();
 				load_minutes()
 				saved(res)
 	        },
-	        error: function() {
-	            error_in_saving("error occured in sending to");
+	        error: function(xhr) {
+		        	minutes_saving=false
+		        	var msg = (xhr.responseJSON && xhr.responseJSON.message) ? xhr.responseJSON.message : "error occured in sending to"
+		            error_in_saving(msg);
 	        }
 	    });
 	}
@@ -266,6 +303,7 @@
 	function clear_minutes(){
 		getbyId('h_minutes_id').value = "0";
 		getbyId('h_minutes_committee_id').value = ""
+		getbyId('del_minutes').style.display = 'none'
 	}
 
 	var count_movant=0

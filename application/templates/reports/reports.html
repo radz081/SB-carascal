@@ -629,5 +629,27 @@
 		}
 
 		
-	}
+	
+		else if(typ==17){
+
+			getDataWithCallback('/get_city_logo', function(res){
+				if(res){
+					if(res!="No City Logo Uploaded"){
+						getbyId('img_minutes_report_city_logo').src="/static/uploads/"+res[0].city_logo
+					}
+				}
+			})
+
+			getDataWithCallback('/get_tbl_config_info', function(res){
+				if(res){
+					getbyId('minutes_report_city_name').innerHTML=res[0].city_name.replace("CITY", "")
+					getbyId('minutes_report_province').innerHTML=res[0].province;
+					getbyId('minutes_report_location').innerHTML=(res[0].type ? 'City' : 'Municipality')
+				}
+			})
+
+			load_minutes_report()
+			$('#div_minutes_report_modal').modal('toggle')
+		}
+}
 </script>

@@ -1,0 +1,259 @@
+<div class="col-sm-12">
+    <div class="card">
+        <div class="card-header d-flex justify-content-between">
+            <div class="header-title">
+                <h4 class="card-title">SESSION VIDEO CONFIGURATION</h4>
+                <p class="text-muted mb-0">Configure reusable videos for all sessions (National Anthem, Intro, Prayers)</p>
+            </div>
+        </div>
+        <div class="card-body">
+            <form id="form_session_videos" enctype="multipart/form-data">
+                
+                <!-- National Anthem Section -->
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <h5 class="mb-3">Pambansang Awit (National Anthem)</h5>
+                        <div class="mb-3" id="current_national_anthem_preview"></div>
+                        <div class="mb-3">
+                            <label for="national_anthem_video" class="form-label">Upload New National Anthem Video</label>
+                            <input type="file" class="form-control" id="national_anthem_video" name="national_anthem_video" accept="video/*">
+                            <small class="text-muted">Leave empty to keep current video</small>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-danger" onclick="deleteVideo('national_anthem')">
+                            <i class="bi bi-trash"></i> Remove Current Video
+                        </button>
+                    </div>
+                </div>
+
+                <hr>
+
+                <!-- Intro Video Section -->
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <h5 class="mb-3">Intro Video</h5>
+                        <div class="mb-3" id="current_intro_preview"></div>
+                        <div class="mb-3">
+                            <label for="intro_video" class="form-label">Upload New Intro Video</label>
+                            <input type="file" class="form-control" id="intro_video" name="intro_video" accept="video/*">
+                            <small class="text-muted">Leave empty to keep current video</small>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-danger" onclick="deleteVideo('intro')">
+                            <i class="bi bi-trash"></i> Remove Current Video
+                        </button>
+                    </div>
+                </div>
+
+                <hr>
+
+                <!-- Opening Prayer Section -->
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <h5 class="mb-3">Opening Prayer</h5>
+                        <div class="mb-3" id="current_opening_prayer_preview"></div>
+                        <div class="mb-3">
+                            <label for="opening_prayer_video" class="form-label">Upload New Opening Prayer Video</label>
+                            <input type="file" class="form-control" id="opening_prayer_video" name="opening_prayer_video" accept="video/*">
+                            <small class="text-muted">Leave empty to keep current video</small>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-danger" onclick="deleteVideo('opening_prayer')">
+                            <i class="bi bi-trash"></i> Remove Current Video
+                        </button>
+                    </div>
+                </div>
+
+                <hr>
+
+                <!-- Closing Prayer Section -->
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <h5 class="mb-3">Closing Prayer</h5>
+                        <div class="mb-3" id="current_closing_prayer_preview"></div>
+                        <div class="mb-3">
+                            <label for="closing_prayer_video" class="form-label">Upload New Closing Prayer Video</label>
+                            <input type="file" class="form-control" id="closing_prayer_video" name="closing_prayer_video" accept="video/*">
+                            <small class="text-muted">Leave empty to keep current video</small>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-danger" onclick="deleteVideo('closing_prayer')">
+                            <i class="bi bi-trash"></i> Remove Current Video
+                        </button>
+                    </div>
+                </div>
+
+                <hr>
+
+                <!-- Pledge Section -->
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <h5 class="mb-3">Pledge / Panunumpa</h5>
+                        <div class="mb-3" id="current_pledge_preview"></div>
+                        <div class="mb-3">
+                            <label for="pledge_video" class="form-label">Upload New Pledge Video</label>
+                            <input type="file" class="form-control" id="pledge_video" name="pledge_video" accept="video/*">
+                            <small class="text-muted">Leave empty to keep current video</small>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-danger" onclick="deleteVideo('pledge')">
+                            <i class="bi bi-trash"></i> Remove Current Video
+                        </button>
+                    </div>
+                </div>
+
+                <hr>
+
+                <!-- Save Button -->
+                <div class="row">
+                    <div class="col-12">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-save"></i> Save Configuration
+                        </button>
+                    </div>
+                </div>
+
+            </form>
+        </div>
+    </div>
+</div>
+
+<script type="text/javascript">
+    $(document).ready(function(){
+        $("#config-menu").addClass("show");
+        
+        // Only load videos if this section is visible (not on initial page load)
+        if ($('#session_videos_navigation').is(':visible')) {
+            loadCurrentVideos();
+        }
+    });
+    
+    // Also load when the navigation item is clicked
+    $(document).on('click', '#li_session_videos', function() {
+        loadCurrentVideos();
+    });
+
+    // Load current video configuration
+    function loadCurrentVideos() {
+        $.ajax({
+            url: '/get_session_video_config',
+            type: 'POST',
+            success: function(response) {
+                if (response.data) {
+                    displayVideoPreview('national_anthem', response.data.national_anthem_path);
+                    displayVideoPreview('intro', response.data.intro_video_path);
+                    displayVideoPreview('opening_prayer', response.data.opening_prayer_path);
+                    displayVideoPreview('closing_prayer', response.data.closing_prayer_path);
+                    displayVideoPreview('pledge', response.data.pledge_video_path);
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error('Error loading video config:', error);
+            }
+        });
+    }
+
+    // Display video preview
+    function displayVideoPreview(videoType, videoPath) {
+        var previewDiv = $('#current_' + videoType + '_preview');
+        
+        if (videoPath && videoPath !== 'None' && videoPath !== '') {
+            previewDiv.html(`
+                <div class="alert alert-info">
+                    <strong>Current Video:</strong> ${videoPath}
+                    <br>
+                    <video width="320" height="240" controls class="mt-2">
+                        <source src="${videoPath}" type="video/mp4">
+                        Your browser does not support the video tag.
+                    </video>
+                </div>
+            `);
+        } else {
+            previewDiv.html(`
+                <div class="alert alert-warning">
+                    <i class="bi bi-exclamation-triangle"></i> No video configured yet
+                </div>
+            `);
+        }
+    }
+
+    // Handle form submission
+    $('#form_session_videos').on('submit', function(e) {
+        e.preventDefault();
+        
+        var formData = new FormData(this);
+        
+        $.ajax({
+            url: '/save_session_video_config',
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function(response) {
+                if (response.status === 'success') {
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Success',
+                        text: response.message || 'Video configuration saved successfully',
+                        timer: 2000
+                    });
+                    loadCurrentVideos();
+                    $('#form_session_videos')[0].reset();
+                } else {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Error',
+                        text: response.message || 'Failed to save video configuration'
+                    });
+                }
+            },
+            error: function(xhr, status, error) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: 'An error occurred while saving: ' + error
+                });
+            }
+        });
+    });
+
+    // Delete specific video
+    function deleteVideo(videoType) {
+        Swal.fire({
+            title: 'Are you sure?',
+            text: "This will remove the " + videoType.replace('_', ' ') + " video from configuration",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            cancelButtonColor: '#3085d6',
+            confirmButtonText: 'Yes, delete it!'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                $.ajax({
+                    url: '/delete_session_video_config',
+                    type: 'POST',
+                    data: { video_type: videoType },
+                    success: function(response) {
+                        if (response.status === 'success') {
+                            Swal.fire({
+                                icon: 'success',
+                                title: 'Deleted',
+                                text: response.message || 'Video removed successfully',
+                                timer: 2000
+                            });
+                            loadCurrentVideos();
+                        } else {
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Error',
+                                text: response.message || 'Failed to delete video'
+                            });
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Error',
+                            text: 'An error occurred: ' + error
+                        });
+                    }
+                });
+            }
+        });
+    }
+</script>

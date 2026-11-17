@@ -1053,18 +1053,6 @@
         });
     }
 
-    function get_sp_number_active(){
-        getDataWithCallback('/get_sp_active', function(res){
-            for(var x=0; x<res.length; x++){
-                if(res[x].status=='ACTIVE'){
-                    $('#sp_number').append(`<option selected value="${res[x].sp_id}"> ${res[x].sp_title} </option>`);
-                }else{
-                    $('#sp_number').append(`<option value="${res[x].sp_id}"> ${res[x].sp_title} </option>`);
-                }
-            }
-        });
-    }
-
     function populate_code_references(){    
         getDataWithCallback('/get_code_and_references', function(res){
             if (res) {

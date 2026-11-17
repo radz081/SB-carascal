@@ -453,43 +453,6 @@
 		})  
 	}
 
-	function delete_committee_petition_referal(elem){
-		var data={
-			petition_id:elem.getAttribute('data-petition_id'),
-			committee_ref_petition_id:elem.getAttribute('data-committee_ref_petition_id'),
-			committee_id:getbyId('h_committee_id').value
-		}
-
-		Swal.fire({
-			title: 'Are you sure?',
-			text: "You won't be able to revert this!",
-			icon: 'warning',
-			showCancelButton: true,
-			confirmButtonColor: '#d33',
-			cancelButtonColor: '#3085d6',
-			confirmButtonText: 'Yes, delete it!',
-			customClass: 'swal_css',
-		}).then((result) => {
-			if (result.isConfirmed) {
-				sendDataWithCallback('/delete_committee_ref_petition',data,function(res){
-					if(res=="successfully Deleted"){
-						if ($.fn.DataTable.isDataTable('#tbl_committee_petition')) {
-				        	$('#tbl_committee_petition').DataTable().clear().draw();
-				        	load_committee_petition(data)
-				        	Swal.fire(
-							  'successfully Remove referal!',
-							  'Your file has been deleted.',
-							  'success'
-							)
-				       	}
-					}else{
-						error_in_saving(res)
-					}
-				})
-			}
-		})
-	}
-
 	function delete_committee_referal(elem){
 		var data={
 			ordinance_id:elem.getAttribute('data-id'),

@@ -43,6 +43,7 @@
      		getbyId('inp_minutes_date').value=dataArr.date
      		// getbyId('div_movant').innerHTML=""
      		getbyId('minutes_no').value=dataArr['minutes_no']
+     		set_minutes_term(dataArr['sp_id'])
      		getbyId('type_minutes').value=dataArr['type']
      		
      		count_movant=0
@@ -85,7 +86,7 @@
         var table=$('#tbl_minutes').DataTable( {
             responsive: true,
             "processing": true,
-            'bStateSave':true,
+            'bStateSave':false,
             dom: 'Bfrtip',
             "ajax": {
                 "type": "GET",
@@ -120,6 +121,9 @@
 				       	count_movant=0;
 				       	count_seconder=0;
 
+					       	// hidden inputs keep JS-set values through form.reset(), so clear the previous entry explicitly
+					       	clear_minutes()
+
 				       	// getbyId('div_movant').innerHTML=""
 				       	// getbyId('div_seconder').innerHTML=""
 
@@ -133,6 +137,8 @@
 
 				       	$('#inp_committee_minutes').val('').trigger("chosen:updated")
 	                	getbyId('form_minutes').reset();
+		                clear_minutes()
+		                set_minutes_term(getbyId('active_sp_id').value)
 
 	                    $("#div_minutes_modal").modal('toggle');
 	                },

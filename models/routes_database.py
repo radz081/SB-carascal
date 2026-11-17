@@ -5,7 +5,6 @@ import os, sys, json
 import pymysql.cursors
 from flask_cors import CORS
 from os.path import exists
-# import simplejson as json
 
 import smtplib
 from email.mime.multipart import MIMEMultipart
@@ -60,8 +59,8 @@ def prnt_G(msg):
 host = "localhost"
 user = "root"
 
-password = "lgucarrascal"
-database1 = "sangunian_db_2"
+password = "lgubislig"
+database1 = "sangunian_db"
 # password = "bislig"
 # database1 = "sangs"
 
@@ -75,7 +74,7 @@ except Exception as e:
 	print(style.RED(ers) + style.RESET(""))
 
 #<---------------------------Crud-------------------------------->
-
+# DEPRECATED: Use cud_safe() instead for SQL injection protection
 def cud(sql):
 	try:
 		db = mysql.connector.connect(host=host, user=user, password =password, database=database1, charset='utf8',use_unicode=True);
@@ -90,11 +89,29 @@ def cud(sql):
 		return "200"
 	except Exception as e:
 		print(style.RED("MYSQL error in loading: '"+str(e)+"' '"+str(sql)+"'") + style.RESET(""))
-		sys.exit("Error message")
+		return "400"
+
+# SAFE version with parameterized queries
+def cud_safe(sql, params=None):
+	"""Execute CUD query safely with parameterized statements"""
+	try:
+		db = mysql.connector.connect(host=host, user=user, password=password, database=database1, charset='utf8', use_unicode=True)
+		con = db.cursor()
+		con.execute(sql, params) if params else con.execute(sql.replace('%%', '%'))
+		db.commit()
+		
+		if db.is_connected():
+			db.close()
+			con.close()
+			print(style.GREEN("Successfully queried (safe)") + style.RESET(""))
+		return "200"
+	except Exception as e:
+		print(style.RED("MYSQL error in loading: '"+str(e)+"'") + style.RESET(""))
 		return "400"
 
 #<---------------------crud closed -------------------------------->
 
+# DEPRECATED: Use cud_callbackid_safe() instead for SQL injection protection
 def cud_callbackid(sql):
 	try:
 		db = mysql.connector.connect(host=host, user=user, password =password, database=database1, charset='utf8',use_unicode=True);
@@ -110,7 +127,26 @@ def cud_callbackid(sql):
 		return ids
 	except Exception as e:
 		print(style.RED("MYSQL error in loading: '"+str(e)+"'") + style.RESET(""))
-		sys.exit("Error message")
+		return None
+
+# SAFE version with parameterized queries
+def cud_callbackid_safe(sql, params=None):
+	"""Execute CUD query safely and return last insert ID"""
+	try:
+		db = mysql.connector.connect(host=host, user=user, password=password, database=database1, charset='utf8', use_unicode=True)
+		con = db.cursor()
+		con.execute(sql, params) if params else con.execute(sql.replace('%%', '%'))
+		db.commit()
+		ids = con.lastrowid
+		
+		if db.is_connected():
+			db.close()
+			con.close()
+			print(style.GREEN(f"Successfully queried (safe), ID: {ids}") + style.RESET(""))
+		return ids
+	except Exception as e:
+		print(style.RED("MYSQL error in loading: '"+str(e)+"'") + style.RESET(""))
+		return None
 
 
 def crud_callbackid(sql,args):
@@ -137,20 +173,27 @@ def crud_callbackid(sql,args):
     except Exception as e:
         print(style.RED(f"MYSQL error in loading: '{e}'") + style.RESET(""))
         return None
-def read(sql):
-#---------3.7v and upper version of py connection -------#
-	try:
-		# prnt_G(sql)
-		db =  mysql.connector.connect(host=host, user=user, password =password, database=database1)
-		con = db.cursor()
-		for result in con.execute(sql, multi=True):
-			return result.fetchall()
-		if(db.is_connected()):
-			db.close()
-			con.close()
-	except Exception as e:
-		print(style.RED("MYSQL error in loading: '"+str(e)+"'") + style.RESET(""))
 
+# SAFE version for SELECT queries with parameterized statements		
+def pyread_safe(sql, params=None):
+	"""Execute SELECT query safely with parameterized statements"""
+	try:
+		connection = pymysql.connect(
+			host=host, 
+			user=user, 
+			password=password, 
+			database=database1,
+			charset='utf8',
+			cursorclass=pymysql.cursors.DictCursor
+		)
+		with connection.cursor() as cursor:
+			cursor.execute(sql, params or ())
+			result = cursor.fetchall()
+			connection.close()
+			return result
+	except Exception as e:
+		print(style.RED("MYSQL error in pyMSQL: '"+str(e)+"'") + style.RESET(""))
+		return []
 
 def pyread(sql):
 	try:
@@ -275,3 +318,78 @@ def crud(sql, ar):
     except Exception as e:
         print("MYSQL error:", str(e))
         return "1062"
+
+
+# ============== INPUT VALIDATION UTILITIES ==============
+
+def validate_int(value, default=0):
+	"""Safely convert value to integer"""
+	try:
+		return int(value)
+	except (ValueError, TypeError):
+		return default
+
+def validate_string(value, max_length=None):
+	"""Sanitize string input"""
+	if value is None:
+		return ""
+	value = str(value).strip()
+	if max_length and len(value) > max_length:
+		value = value[:max_length]
+	return value
+
+def validate_email(email):
+	"""Basic email validation"""
+	import re
+	if not email:
+		return False
+	pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+	return re.match(pattern, str(email)) is not None
+
+def validate_phone(phone):
+	"""Basic phone validation"""
+	if not phone:
+		return False
+	# Remove common formatting characters
+	phone_digits = ''.join(c for c in str(phone) if c.isdigit())
+	return len(phone_digits) >= 7  # Minimum 7 digits
+
+def sanitize_sql_string(value):
+	"""
+	Escape single quotes for SQL string values
+	NOTE: This is a fallback. Always prefer parameterized queries!
+	"""
+	if value is None:
+		return ""
+	return str(value).replace("'", "''")
+
+
+def ensure_upload_directory(directory_path):
+	"""
+	Ensure upload directory exists, create if it doesn't
+	
+	Args:
+		directory_path: Path object or string path to directory
+		
+	Returns:
+		Path object to the directory
+	"""
+	from pathlib import Path
+	import os
+	
+	try:
+		if isinstance(directory_path, str):
+			directory_path = Path(directory_path)
+		
+		# Resolve to absolute path
+		directory_path = directory_path.resolve()
+		
+		# Create directory and all parent directories
+		if not directory_path.exists():
+			directory_path.mkdir(parents=True, exist_ok=True)
+			print(f"✓ Created directory: {directory_path}")
+		
+		return directory_path
+	except Exception as e:
+		print(f"✗ Error creating directory {directory_path}: {e}")
+		raise

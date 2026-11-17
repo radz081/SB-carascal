@@ -1,12 +1,3 @@
-function onGetFile(el) {
- var file = el. files[0]
-
- var options = { inWrapper: false, ignoreWidth: true, ignoreHeight: true }
-
- docx.renderAsync(file, document.getElementById("open_docs"), null, options)
-   .then(x => console.log("docx: finished"));
-}
-
 function saved(message){
     Swal.fire({
       position: 'middle',
@@ -18,25 +9,6 @@ function saved(message){
     })
 }
 
-
-function PreviewWordDoc(inp_id) {
-    //Read the Word Document data from the File Upload.
-    var doc = document.getElementById(inp_id).files[0];
-
-    //If Document not NULL, render it.
-    if (doc != null) {
-        //Set the Document options.
-        var docxOptions = Object.assign(docx.defaultOptions, {
-            useMathMLPolyfill: true
-        });
-
-        //Reference the Container DIV.
-        var container = document.querySelector("#open_docs");
-
-        //Render the Word Document.
-        docx.renderAsync(doc, container, null, docxOptions);
-    }
-}
 
 
 

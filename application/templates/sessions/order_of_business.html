@@ -374,17 +374,5 @@
         $( "#session2" ).addClass( "selected_page_color" );
 	});
 
-    function get_council_active(){
-    	getDataWithCallback('/get_all_active_councilor', function(res){
-            var datalistId = getbyId('council_list_active');
-            console.log(res)
-            for(var i = 0; i < res.length; i++) {
-                var opt = document.createElement('option');
-                opt.setAttribute('data-id',res[i].info_id)
-                opt.setAttribute('value',res[i].fullname)
-                datalistId.appendChild(opt)
-            }
-        });
-    }
 </script>
 {% endblock %}

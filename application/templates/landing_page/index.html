@@ -1613,54 +1613,6 @@
         console.log('Error:', error);
     });
 
-    function pop_(track_gen_id, type, innerHTML){
-        getbyId('doc_tracking_genid').value = track_gen_id
-        getbyId("doc_innerhtml").value = innerHTML
-        sendDataWithCallback('/get_document_tracking_where_trackgenId', {track_gen_id:track_gen_id}, (res)=>{
-            if(res[0].id){
-                show_edit()
-            }
-            if(res[0].doc_status==1){
-                show_recom()
-            }
-        })
-
-        $('#pop_modal').modal('show');
-    }
-
-    function pop_2(track_gen_id, type, innerHTML){
-        getbyId('doc_tracking_genid2').value = track_gen_id
-        getbyId("doc_innerhtml2").value = innerHTML
-        sendDataWithCallback('/get_document_tracking_where_trackgenId', {track_gen_id:track_gen_id}, (res)=>{
-            if(res[0].id){
-                show_edit2()
-            }
-            if(res[0].doc_status==2){
-                show_recom2()
-            }
-        })
-
-        $('#reffer_refferback_modal').modal('show');
-    }
-
-    function approved_reffer_back(track_gen_id, status){
-        sendDataWithCallback("/get_document_status_tracking", {track_gen_id: track_gen_id}, (res)=>{
-            getbyId('status_submit').value = status
-            getbyId('track_gen_id_submit').value = track_gen_id
-            if(status==res[0].action_taken){
-                getbyId('btn_track_gen_id_cancel').style.display = "none"
-                getbyId('btn_track_gen_id_reffer_back').style.display = "block"
-                getbyId('btn_track_gen_id_submit').style.display = "block"
-            }else{
-                getbyId('btn_track_gen_id_cancel').style.display = "block"
-                getbyId('btn_track_gen_id_reffer_back').style.display = "none"
-                getbyId('btn_track_gen_id_submit').style.display = "none"
-            }
-        })
-        
-        $('#approve_refferback_modal').modal('show');
-    }
-
 
     function voting(){
         sendDataWithCallback('/get_session_attendance', {session_id : byId('session_oob_id').value}, (res)=>{

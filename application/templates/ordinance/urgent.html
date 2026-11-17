@@ -63,16 +63,10 @@
 					       	getbyId('h_committee_id_ord').value=""
 					       	getbyId('h_sp_legislature').value=""
 
-					       	count_authors=0
-					       	count_co_authors=0
-					       	count_sponsor=0
 
 					       	// $('#inp_sp_ord_legislature').val('').trigger("chosen:updated")
 					       	$('#inp_committee_ordinance').val('').trigger("chosen:updated")
 					       	
-					       	getbyId('div_ordinance_author').innerHTML=""
-					       	getbyId('div_ordinance_co_author').innerHTML=""
-					       	getbyId('div_ordinance_sponsor').innerHTML=""
 
 					       	getbyId('h_ordinance_id').value=0
 					       	getbyId('h_committee_id_ord').value=""
@@ -166,39 +160,17 @@
 	            		load_minutes_file(data)
 	            		load_ordinance_veto_file(data)
 
-	            		count_authors=0
-		     			sendDataWithCallback('/get_author_ordinances',data,function(res){
-		     				getbyId('div_ordinance_author').innerHTML="";
-	                        res.forEach(function(i,index){
-		                        add_ord_author(function(sel) {
-		                            sel.value = i['author']
-		                            $(sel).trigger('chosen:updated');
-		                        });
-		                    })
+	            		fill_ord_people_options()
+ 		var ord_people=[['/get_author_ordinances','sel_ord_authors','author'],
+ 			['/get_co_author_ordinance','sel_ord_co_authors','co_author'],
+ 			['/get_sponsor_ordinance','sel_ord_sponsors','sponsor']]
+ 		ord_people.forEach(function(r){
+ 			set_ord_people(r[1],[])
+ 			sendDataWithCallback(r[0],data,function(res){
+ 				set_ord_people(r[1], res.map(function(i){ return String(i[r[2]]) }))
+ 			})
+ 		})
 
-			     		})
-
-		     			count_co_authors=0
-						sendDataWithCallback('/get_co_author_ordinance',data,function(res){
-							getbyId('div_ordinance_co_author').innerHTML="";
-	          				res.forEach(function(i,index){
-		                        add_ord_co_author(function(sel) {
-		                            sel.value = i['co_author']
-		                            $(sel).trigger('chosen:updated');
-		                        });
-		                    })
-			     		})
-
-						count_sponsor=0
-			     		sendDataWithCallback('/get_sponsor_ordinance',data,function(res){
-			     			getbyId('div_ordinance_sponsor').innerHTML="";
-	          				res.forEach(function(i,index){
-		                        add_ord_sponsor(function(sel) {
-		                            sel.value = i['sponsor']
-		                            $(sel).trigger('chosen:updated');
-		                        });
-		                    })
-			     		})
 	            		
 	            	})
 	                $('#div_add_ordinance').modal('toggle');    

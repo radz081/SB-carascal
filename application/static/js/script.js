@@ -1,13 +1,5 @@
 let status= 1
 
-function onGetFile(el) {
- var file = el. files[0]
-
- var options = { inWrapper: false, ignoreWidth: true, ignoreHeight: true }
- docx.renderAsync(file, document.getElementById("container"), null, options)
-   .then(x => console.log("docx: finished"));
-}
-
 function theme(div,btn){
 	var container=getbyId(div);
 	var toogle=getbyId(btn).innerHTML;
@@ -31,15 +23,6 @@ function theme(div,btn){
 function activaTab(tab){
   $('.nav-tabs a[open_doc_ordhref="#' + tab + '"]').tab('show');
 };
-
-function hideShow(id) {
-    var id = getbyId(id);
-    if(id.style.display != 'block') {
-        id.style.display = 'block';
-    }else {
-        id.style.display = 'none';
-    }
-}
 
 function getbyId(id){
 	var rd=document.getElementById(id);
@@ -124,26 +107,6 @@ function error_in_saving(message){
 	})
 }
 
-function send_load_data(){
-	swal.fire({
-	  title: "Sending Data",
-	  text: "Submiting data request",
-	  type: "info",
-	  showCancelButton: true,
-	  showLoaderOnConfirm: true,
-	  preConfirm: () => {
-	    return fetch(console.log("dsfds"))
-	    .then()
-	    .catch(() => {
-	        Swal.fire({
-	          icon: 'error',
-	          title: 'Error occured'
-	        })
-	    })
-	  }
-	})
-}
-
 function warning(message){
 	Swal.fire({
 	  icon: 'warning',
@@ -223,33 +186,8 @@ var mydragg = function(){
 
 var a = ['','one ','two ','three ','four ', 'five ','six ','seven ','eight ','nine ','ten ','eleven ','twelve ','thirteen ','fourteen ','fifteen ','sixteen ','seventeen ','eighteen ','nineteen '];
 var b = ['', '', 'twenty','thirty','forty','fifty', 'sixty','seventy','eighty','ninety'];
-function inWords (num) {
-    if ((num = num.toString()).length > 9) return 'overflow';
-    n = ('000000000' + num).substr(-9).match(/^(\d{2})(\d{2})(\d{2})(\d{1})(\d{2})$/);
-    if (!n) return; var str = '';
-    str += (n[1] != 0) ? (a[Number(n[1])] || b[n[1][0]] + ' ' + a[n[1][1]]) + 'crore ' : '';
-    str += (n[2] != 0) ? (a[Number(n[2])] || b[n[2][0]] + ' ' + a[n[2][1]]) + 'lakh ' : '';
-    str += (n[3] != 0) ? (a[Number(n[3])] || b[n[3][0]] + ' ' + a[n[3][1]]) + 'thousand ' : '';
-    str += (n[4] != 0) ? (a[Number(n[4])] || b[n[4][0]] + ' ' + a[n[4][1]]) + 'hundred ' : '';
-    str += (n[5] != 0) ? ((str != '') ? 'and ' : '') + (a[Number(n[5])] || b[n[5][0]] + ' ' + a[n[5][1]]) + 'PESOS ' : '';
-    return str;
-}
-
-function select_remove_value_where(id,value){
-	var selectobject = document.getElementById(id);
-    for (var i=0; i<selectobject.length; i++) {
-        if (selectobject.options[i].value == value)
-            selectobject.remove(i);
-    }
-}
-
 function showModal(div){
 	$('#'+div).show().addClass('modal-open');
-}
-
-function download_file(elem) {
-	alert(elem.getAttribute('data-path'))
-
 }
 
 function delete_file(elem){
@@ -320,45 +258,6 @@ function delete_file_res(elem){
 		}
 	})
 	
-}
-
-function load_resolution_file(data){
-	sendDataWithCallback('/get_resolution_file',data,function(res){
-		if(res){
-			user_permissions = role_specific_access;
-			let can_write_;
-
-			if (role_specific_access === 'admin') {
-				can_write_ = true;
-			} else {
-				can_write_ = user_permissions.some(function (p) {
-					return p.routes === "/resolution" && p.write === "on";
-				});
-			}
-			res.forEach(function(file) {
-				let del_btn =``
-				if(can_write_){
-					del_btn = "<button type='button' data-ordinance_id="+ file.ordinance_id+ " data-id=" + file.ordinance_file_id+ " onclick=delete_file_res(this)> DELETE </button>"
-				}
-				let dl_btn = "<a data-path=" +file.path+ " href=" + '/static/uploads/'+file.path+ "><button type='button'> DOWNLOAD </button></a>"
-				file.action = dl_btn + del_btn ;
-			})
-			if ($.fn.DataTable.isDataTable('#tbl_add_ordinance_file')) {
-	        	$('#tbl_add_ordinance_file').DataTable().destroy();
-	       	}
-
-			var table=$('#tbl_add_ordinance_file').DataTable({
-                data:res,
-                 columns: [
-                 	{data:"filename"},
-                 	{data: "action"}
-                 ],
-                responsive: true,
-                searching: false, paging: false, info: false
-
-            });
-		}
-	})
 }
 
 function load_ordinance_file(data){
@@ -705,14 +604,6 @@ function printer(to_print_id){
 	})
 }
 
-function printer_landscape(to_print_id){
-	printJS({printable:to_print_id,type: 'html',css: ['../static/css/style.css','../static/css/bootstrap.min.css',
-		'../static/css/dataTables.bootstrap.css','../static/css/jquery.dataTables.min.css'],honorMarginPadding:false ,style: '@page { size: Letter landscape; }:root{filter: invert(0%);};}',scanStyles:false,onError: function  (error) {
-		alert('Error found => ' + error.message)
-		}
-	})
-}
-
 function doc_tracking_reso(){
 	getDataWithCallback('/get_track_document_reso', function(res){
 		if ($.fn.DataTable.isDataTable('#tbl_document_traking')) {
@@ -759,102 +650,6 @@ function doc_tracking_reso(){
 	})
 
 
-}
-
-function get_res_ord_pet(typ){
-    if ($.fn.DataTable.isDataTable('#tbl_document_traking')) {
-        $('#tbl_document_traking').DataTable().clear().draw();
-    }
-
-    if(typ==1){
-        doc_tracking_reso()
-    }else if(typ==2){
-        getDataWithCallback('/get_track_document_ord', function(res){
-			if ($.fn.DataTable.isDataTable('#tbl_document_traking')) {
-                $('#tbl_document_traking').DataTable().destroy();
-            }
-            var table=$('#tbl_document_traking').DataTable({
-                data:res,
-                columns: [
-                    {data:"ordinance_id"},
-                    {data:"ordinance_number"},
-                    {data:"ordinance_title"},
-                    {data:"committee"},
-                    {data:"stats"},
-                    {data:"type_document"},
-                    {data:"date_enacted"},
-                ],
-                 buttons: [
-                    {
-                        extend: 'print',
-                        text: 'Print',
-                        filename: 'file',
-                        title: 'Print',
-                        titleAttr: 'Print'
-                        ,'className': 'btn btn-warning'
-                    }
-                ],
-                dom: 'Bfrtip',
-                responsive: true,
-                "pagingType": "full_numbers",
-                "bInfo": false,
-                searching:true,
-                pageLength: 3,
-            });
-
-            $('#tbl_document_traking tbody').on('dblclick', 'tr', function (){
-	        	var dataArr = $('#tbl_document_traking').DataTable().row( this ).data();
-
-	        	getbyId('document_id').value=dataArr['ordinance_id']
-	        	getbyId('document_type').value="ORDINANCE"
-
-	        	$("#div_modal_track").modal('show')
-		    })
-		})
-    }else if(typ==3){
-        getDataWithCallback('/get_track_document_pet', function(res){
-			if ($.fn.DataTable.isDataTable('#tbl_document_traking')) {
-                $('#tbl_document_traking').DataTable().destroy();
-            }
-            var table=$('#tbl_document_traking').DataTable({
-                data:res,
-                columns: [
-                    {data:"petition_id"},
-                    {data:"title"},
-                    {data:"committee"},
-                    {data:"stats"},
-                    {data:"type_document"},
-                    {data:"date_petetion"},
-                ],
-                 buttons: [
-                    {
-                        extend: 'print',
-                        text: 'Print',
-                        filename: 'file',
-                        title: 'Print',
-                        titleAttr: 'Print'
-                        ,'className': 'btn btn-warning'
-                    }
-                ],
-                dom: 'Bfrtip',
-                responsive: true,
-                "pagingType": "full_numbers",
-                "bInfo": false,
-                searching:true,
-                pageLength: 3,
-            });
-
-            $('#tbl_document_traking tbody').on('dblclick', 'tr', function (){
-	        	var dataArr = $('#tbl_document_traking').DataTable().row( this ).data();
-
-	        	getbyId('document_id').value=dataArr['petition_id']
-	        	getbyId('document_type').value="PETETION"
-	        	
-	        	$("#div_modal_track").modal('show')
-		    })
-
-		})
-    }
 }
 
 /* reports */
@@ -911,48 +706,6 @@ function get_track_document_reports(data_id,type){
 
 /* end reports */
 
-
-function get_track_document(data_id,type){
-    var data={
-        typ:type,
-        id:data_id
-    }
-
-    sendDataWithCallback('/get_track_document_logs',data,function(res){
-        if(res[0]){
-            if ($.fn.DataTable.isDataTable('#tbl_document_traking')) {
-                $('#tbl_document_traking').DataTable().destroy();
-            }
-            var table=$('#tbl_document_traking').DataTable({
-                data:res,
-                columns: [
-                    {data:"track_gen_id"},
-                    {data:"title"},
-                    {data:"committee"},
-                    {data:"stats"},
-                    {data:"type_document"},
-                    {data:"date"},
-                ],
-                buttons: [
-                    {
-                        extend: 'print',
-                        text: 'Print',
-                        filename: 'file',
-                        title: 'Print',
-                        titleAttr: 'Print'
-                        ,'className': 'btn btn-warning prnt_top'
-                    }
-                ],
-                dom: 'Bfrtip',
-                responsive: true,
-                "pagingType": "full_numbers",
-                "bInfo": false,
-                searching:true,
-                pageLength: 3,
-            }); 
-        }
-    })
-}
 
 
 function numberWithCommas(x) {
@@ -1113,39 +866,18 @@ function open_doc_res(elem, tbl) {
 				})
  		})
 
- 		count_authors=0
-			sendDataWithCallback('/get_author_resolutions',data,function(res){
-				getbyId('div_resolution_author').innerHTML="";
-            res.forEach(function(i,index){
-                add_res_author(function(sel) {
-                    sel.value = i['author']
-                    $(sel).trigger('chosen:updated');
-                });
-            })
+ 		fill_res_people_options()
+ 		var res_people=[['/get_author_resolutions','sel_res_authors','author'],
+ 			['/get_co_author_resolutions','sel_res_co_authors','co_author'],
+ 			['/get_sponsor_resolutions','sel_res_sponsors','sponsor'],
+ 			['/get_cosponsor_resolutions','sel_res_cosponsors','cosponsor']]
+ 		res_people.forEach(function(r){
+ 			set_res_people(r[1],[])
+ 			sendDataWithCallback(r[0],data,function(res){
+ 				set_res_people(r[1], res.map(function(i){ return String(i[r[2]]) }))
+ 			})
  		})
 
-			count_co_authors=0
-		sendDataWithCallback('/get_co_author_resolutions',data,function(res){
-			getbyId('div_resolution_co_author').innerHTML="";
-            res.forEach(function(i,index){
-                add_res_co_author(function(sel) {
-                    sel.value = i['co_author']
-                    $(sel).trigger('chosen:updated');
-                });
-            })
- 		})
-
-		count_sponsor=0
- 		sendDataWithCallback('/get_sponsor_resolutions',data,function(res){
- 			getbyId('div_resolution_sponsor').innerHTML="";
-            res.forEach(function(i,index){
-                add_res_sponsor(function(sel) {
-                    sel.value = i['sponsor']
-                    $(sel).trigger('chosen:updated');
-                });
-            })
- 		})
- 		
  		$("#div_resolution_modal").modal('toggle');
  	}
 }
@@ -1258,39 +990,17 @@ function open_doc_ord(elem, tbl){
     		load_ordinance_file(data)
     		load_committe_ref_file(data)
 
-    		count_authors=0
- 			sendDataWithCallback('/get_author_ordinances',data,function(res){
- 				getbyId('div_ordinance_author').innerHTML="";
-                res.forEach(function(i,index){
-                    add_ord_author(function(sel) {
-                        sel.value = i['author']
-                        $(sel).trigger('chosen:updated');
-                    });
-                })
+    		fill_ord_people_options()
+ 		var ord_people=[['/get_author_ordinances','sel_ord_authors','author'],
+ 			['/get_co_author_ordinance','sel_ord_co_authors','co_author'],
+ 			['/get_sponsor_ordinance','sel_ord_sponsors','sponsor']]
+ 		ord_people.forEach(function(r){
+ 			set_ord_people(r[1],[])
+ 			sendDataWithCallback(r[0],data,function(res){
+ 				set_ord_people(r[1], res.map(function(i){ return String(i[r[2]]) }))
+ 			})
+ 		})
 
-     		})
-
- 			count_co_authors=0
-			sendDataWithCallback('/get_co_author_ordinance',data,function(res){
-				getbyId('div_ordinance_co_author').innerHTML="";
-  				res.forEach(function(i,index){
-                    add_ord_co_author(function(sel) {
-                        sel.value = i['co_author']
-                        $(sel).trigger('chosen:updated');
-                    });
-                })
-     		})
-
-			count_sponsor=0
-     		sendDataWithCallback('/get_sponsor_ordinance',data,function(res){
-     			getbyId('div_ordinance_sponsor').innerHTML="";
-  				res.forEach(function(i,index){
-                    add_ord_sponsor(function(sel) {
-                        sel.value = i['sponsor']
-                        $(sel).trigger('chosen:updated');
-                    });
-                })
-     		})
 
     	})
 
