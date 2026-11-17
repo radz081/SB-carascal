@@ -48,3 +48,19 @@ Thumbs.db
 node_modules/
 package-lock.json
 package.json
+
+# Local notes, one-off scripts and uploaded data (not committed)
+FIX_RECURSION_ERROR.md
+RECURSION_FIX_COMPLETE.md
+SESSION_FORM_UPDATE_COMPLETE.md
+SESSION_VIDEO_CONFIG_README.md
+SETUP_SESSION_VIDEOS.md
+fix_directory_creation.py
+fix_sql_injection.py
+sql_injection_report.txt
+test_session_video_config.py
+run_migration.bat
+run_migration.ps1
+database_migrations/
+docs/
+application/static/uploads/
