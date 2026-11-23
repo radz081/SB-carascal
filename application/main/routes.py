@@ -354,7 +354,7 @@ def sp_budget():
 @authorize
 def capital_oultay():
 	session_data=session['data']
-	return render_template('budget/capital_oultay.html', data=session_data)
+	return render_template('budget/capital_outlay.html', data=session_data)
 	
 
 @main.route('/sp_member_deduction', methods=['GET', 'POST'])
@@ -619,7 +619,7 @@ def barangay_resolution():
 @authorize
 def background():
 	session_data=session['data']
-	return render_template('config/updload_background.html', data=session_data)
+	return render_template('config/upload_background.html', data=session_data)
 
 
 @main.route('/session_video_config', methods=['GET', 'POST'])
@@ -692,12 +692,20 @@ def meetings():
 def login():
 	p=json.loads(request.data)
 	sel="""
-		select tl.login_id, fullname, tla.routes, tl.role from tbl_login tl
+		select tl.login_id, fullname, tla.routes, tl.role, tl.password from tbl_login tl
 		left join tbl_login_access tla on tla.login_id=tl.login_id
-		where tl.username=%s and tl.password=%s
+		where tl.username=%s
 	"""
-	args=(str(p['username']), str(p['password']))
-	rd=rd_query(sel, args)
+	rd=rd_query(sel, (str(p['username']),))
+	if rd and isinstance(rd, list):
+		# duplicate usernames: keep only the rows of the account whose password matches
+		match_id = next((r['login_id'] for r in rd if verify_password(r['password'], p['password'])), None)
+		rd = [r for r in rd if r['login_id'] == match_id]
+		if rd and not is_password_hashed(rd[0]['password']):
+			# upgrade legacy plaintext to a hash on first successful login
+			cud_safe("update tbl_login set password=%s where login_id=%s", (hash_password(p['password']), match_id))
+		for r in rd:
+			r.pop('password', None)
 
 	if rd:
 		if rd!="":

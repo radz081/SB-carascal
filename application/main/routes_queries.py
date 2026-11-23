@@ -13,6 +13,7 @@ CORS(query)
 
 ALLOWED_EXTENSIONS = set(['txt', 'pdf', 'png', 'jpg', 'jpeg', 'gif', 'docx','doc', 'xls','xlsx', 'mp4'])
 IMAGE_FOLDER = os.path.join('static', 'image')
+READINGS = {"1": "1st", "2": "2nd", "3": "3rd"}
 
 import unicodedata
 import re
@@ -34,6 +35,17 @@ def login_required(f):
     def decorated_function(*args, **kwargs):
         if 'data' not in session:
             return jsonify({'error': 'Unauthorized'}), 401
+        return f(*args, **kwargs)
+    return decorated_function
+
+def user_admin_required(f):
+    # same rule as the /user page in routes.py: admin role, or granted /user access
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'data' not in session:
+            return jsonify({'error': 'Unauthorized'}), 401
+        if session.get('sessioned_role') != "2" and '/user' not in session.get('obj', []):
+            return jsonify({'error': 'Forbidden'}), 403
         return f(*args, **kwargs)
     return decorated_function
 
@@ -350,7 +362,7 @@ def save_sp():
 
 				file=request.files[filename_array]
 
-				n_path = Path(__file__).parent / "../static/uploads/upload_sp_logo" / str(p['sp_id'])
+				n_path = Path(__file__).parent / "../static/uploads/upload_sp_logo" / str(int(p['sp_id']))
 				n_path.resolve()
 				
 				if file and allowed_file(file.filename):
@@ -363,7 +375,7 @@ def save_sp():
 						app.config['UPLOAD_FOLDER']=n_path
 						file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
 
-					location1="upload_sp_logo//"+str(p['sp_id'])
+					location1="upload_sp_logo//"+str(int(p['sp_id']))
 					location1.replace("//", "\\\\");
 					location=location1+"/"+filename
 					path_location=location.replace("/", "\\\\");
@@ -378,7 +390,7 @@ def save_sp():
 				file_name="citylogo["+str(y)+"]"
 				file=request.files[filename_array]
 
-				n_path = Path(__file__).parent / "../static/uploads/upload_city_logo" / str(p['sp_id'])
+				n_path = Path(__file__).parent / "../static/uploads/upload_city_logo" / str(int(p['sp_id']))
 				n_path.resolve()
 				
 				if file and allowed_file(file.filename):
@@ -391,7 +403,7 @@ def save_sp():
 						app.config['UPLOAD_FOLDER']=n_path
 						file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
 
-					location1="upload_city_logo//"+str(p['sp_id'])
+					location1="upload_city_logo//"+str(int(p['sp_id']))
 					location1.replace("//", "\\\\");
 					location=location1+"/"+filename
 					path_location=location.replace("/", "\\\\");
@@ -1193,7 +1205,7 @@ def del_petition():
 	delete="""delete from tbl_petition where petition_id=%s"""
 	delete_params = [str(p['petition_id'])]
 	cud_safe(delete, delete_params)
-	n_path = Path(__file__).parent / "../static/uploads/upload_files" / str(p['petition_id'])
+	n_path = Path(__file__).parent / "../static/uploads/upload_files" / str(int(p['petition_id']))
 	n_path.resolve()
 	if Path.exists(n_path):
 		shutil.rmtree(n_path)
@@ -1207,7 +1219,7 @@ def del_resolution_file_attach():
 	delete="""delete from tbl_resolution_file where resolution_file_id=%s"""
 	delete_params = [str(p['resolution_file_id'])]
 	cud_safe(delete, delete_params)
-	n_path = Path(__file__).parent / "../static/uploads/upload_files_resolution" / str(p['resolution_id'])
+	n_path = Path(__file__).parent / "../static/uploads/upload_files_resolution" / str(int(p['resolution_id']))
 	n_path.resolve()
 	if Path.exists(n_path):
 		shutil.rmtree(n_path)
@@ -1381,7 +1393,7 @@ def del_documents_refferals():
 	delete="""delete from tbl_documents_refferals where documents_refferals_id=%s"""
 	delete_params = [str(p['document_referal_id'])]
 	cud_safe(delete, delete_params)
-	n_path = Path(__file__).parent / "../static/uploads/upload_document_referals" / str(p['document_referal_id'])
+	n_path = Path(__file__).parent / "../static/uploads/upload_document_referals" / str(int(p['document_referal_id']))
 	n_path.resolve()
 	if Path.exists(n_path):
 		shutil.rmtree(n_path)
@@ -1395,7 +1407,7 @@ def del_barangay_ordinance():
 	delete="""delete from tbl_barangay_ordinance where barangay_ordinance_id=%s"""
 	delete_params = [str(p['barangay_ordinance_id'])]
 	cud_safe(delete, delete_params)
-	n_path = Path(__file__).parent / "../static/uploads/upload_barangay_ordinance" / str(p['barangay_ordinance_id'])
+	n_path = Path(__file__).parent / "../static/uploads/upload_barangay_ordinance" / str(int(p['barangay_ordinance_id']))
 	n_path.resolve()
 	if Path.exists(n_path):
 		shutil.rmtree(n_path)
@@ -1409,7 +1421,7 @@ def del_barangay_resolution():
 	delete="""delete from tbl_barangay_resolution where barangay_resolution_id=%s"""
 	delete_params = [str(p['barangay_resolution_id'])]
 	cud_safe(delete, delete_params)
-	n_path = Path(__file__).parent / "../static/uploads/upload_barangay_resolution" / str(p['barangay_resolution_id'])
+	n_path = Path(__file__).parent / "../static/uploads/upload_barangay_resolution" / str(int(p['barangay_resolution_id']))
 	n_path.resolve()
 	if Path.exists(n_path):
 		shutil.rmtree(n_path)
@@ -1423,7 +1435,7 @@ def del_executive_order():
 	delete="""delete from tbl_executive_order where executive_order_id=%s"""
 	delete_params = [str(p['executive_order_id'])]
 	cud_safe(delete, delete_params)
-	n_path = Path(__file__).parent / "../static/uploads/upload_executive_order" / str(p['executive_order_id'])
+	n_path = Path(__file__).parent / "../static/uploads/upload_executive_order" / str(int(p['executive_order_id']))
 	n_path.resolve()
 	if Path.exists(n_path):
 		shutil.rmtree(n_path)
@@ -1436,7 +1448,7 @@ def del_memorandom():
 	delete="""delete from tbl_memorandom where memorandom_id=%s"""
 	delete_params = [str(p['memorandom_id'])]
 	cud_safe(delete, delete_params)
-	n_path = Path(__file__).parent / "../static/uploads/upload_memorandom" / str(p['memorandom_id'])
+	n_path = Path(__file__).parent / "../static/uploads/upload_memorandom" / str(int(p['memorandom_id']))
 	n_path.resolve()
 	if Path.exists(n_path):
 		shutil.rmtree(n_path)
@@ -1796,7 +1808,7 @@ def save_ordinance():
 				file_name="file_attach["+str(x)+"]"
 				file=request.files[filename_array]
 
-				n_path = Path(__file__).parent / "../static/uploads/upload_files_committee_reports" / str(p['ordinance_id'])
+				n_path = Path(__file__).parent / "../static/uploads/upload_files_committee_reports" / str(int(p['ordinance_id']))
 				n_path.resolve()
 				
 				if file and allowed_file(file.filename):
@@ -1809,7 +1821,7 @@ def save_ordinance():
 						app.config['UPLOAD_FOLDER']=n_path
 						file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
 
-					location1="upload_ordinance_files//"+str(p['ordinance_id'])
+					location1="upload_ordinance_files//"+str(int(p['ordinance_id']))
 					location1.replace("//", "\\\\");
 					location=location1+"/"+filename.replace("'","")
 					path_location=location.replace("/", "\\\\");
@@ -1826,7 +1838,7 @@ def save_ordinance():
 				file_name_min="file_committee_ref["+str(y)+"]"
 
 				file=request.files[file_name_min]
-				n_path = Path(__file__).parent / "../static/uploads/upload_committee_ordinance_files" / str(p['ordinance_id'])
+				n_path = Path(__file__).parent / "../static/uploads/upload_committee_ordinance_files" / str(int(p['ordinance_id']))
 				n_path.resolve()
 				
 				if file and allowed_file(file.filename):
@@ -1839,7 +1851,7 @@ def save_ordinance():
 						app.config['UPLOAD_FOLDER']=n_path
 						file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
 
-					location1="upload_committee_ordinance_files//"+str(p['ordinance_id'])
+					location1="upload_committee_ordinance_files//"+str(int(p['ordinance_id']))
 					location1.replace("//", "\\\\");
 					location=location1+"/"+filename
 					path_location=location.replace("/", "\\\\");
@@ -1853,7 +1865,7 @@ def save_ordinance():
 				file_name_min="file_veto["+str(z)+"]"
 
 				file=request.files[file_name_min]
-				n_path = Path(__file__).parent / "../static/uploads/upload_veto_ordinance" / str(p['ordinance_id'])
+				n_path = Path(__file__).parent / "../static/uploads/upload_veto_ordinance" / str(int(p['ordinance_id']))
 				n_path.resolve()
 				
 				if file and allowed_file(file.filename):
@@ -1866,7 +1878,7 @@ def save_ordinance():
 						app.config['UPLOAD_FOLDER']=n_path
 						file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
 
-					location1="upload_veto_ordinance//"+str(p['ordinance_id'])
+					location1="upload_veto_ordinance//"+str(int(p['ordinance_id']))
 					location1.replace("//", "\\\\");
 					location=location1+"/"+filename
 					path_location=location.replace("/", "\\\\");
@@ -2835,7 +2847,7 @@ def del_minutes():
 	delete="""delete from tbl_minutes where minutes_id=%s"""
 	delete_params = [str(p['minutes_id'])]
 	cud_safe(delete, delete_params)
-	n_path = Path(__file__).parent / "../static/uploads/upload_files_minutes" / str(p['minutes_id'])
+	n_path = Path(__file__).parent / "../static/uploads/upload_files_minutes" / str(int(p['minutes_id']))
 	n_path.resolve()
 	if Path.exists(n_path):
 		shutil.rmtree(n_path)
@@ -2883,7 +2895,7 @@ def save_minutes():
 		update_params = [str(p['type_minutes']), str(p['date']), str(p['minutes_no']), str(p['sp_id']), str(p['minutes_id'])]
 		cud_safe(update, update_params)
 
-		min_id = p['minutes_id']
+		min_id = int(p['minutes_id'])
 
 		delete_movant="""delete from tbl_minutes_movant where minutes_id=%s"""
 		delete_movant_params = [str(p['minutes_id'])]
@@ -3098,7 +3110,7 @@ def save_committee_reports():
 			os.chdir('application')
 			os.chdir('static')
 			loc = "uploads/upload_committee_report_files"
-			location=""+str(loc)+"//"+str(p['h_committee_report_id'])
+			location=""+str(loc)+"//"+str(int(p['h_committee_report_id']))
 			location.replace("//", "\\\\");
 			if file and allowed_file(file.filename):
 				filename = custom_secure_filename(file.filename)
@@ -3183,7 +3195,7 @@ def save_committee_information():
 			os.chdir('application')
 			os.chdir('static')
 			loc = "upload_committee_information_files"
-			location=""+str(loc)+"//"+str(p['h_committee_information_id'])
+			location=""+str(loc)+"//"+str(int(p['h_committee_information_id']))
 			location.replace("//", "\\\\");
 			if file and allowed_file(file.filename):
 				filename = custom_secure_filename(file.filename)
@@ -3505,7 +3517,7 @@ def save_committee_resolution():
 
 				file=request.files[filename_array]
 
-				n_path = Path(__file__).parent / "../static/uploads/upload_committee_resolution_files" / str(p['resolution_id_main'])
+				n_path = Path(__file__).parent / "../static/uploads/upload_committee_resolution_files" / str(int(p['resolution_id_main']))
 				n_path.resolve()
 				
 				if file and allowed_file(file.filename):
@@ -3518,7 +3530,7 @@ def save_committee_resolution():
 						app.config['UPLOAD_FOLDER']=n_path
 						file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
 
-					location1="upload_committee_resolution_files//"+str(p['resolution_id_main'])
+					location1="upload_committee_resolution_files//"+str(int(p['resolution_id_main']))
 					location1.replace("//", "\\\\");
 					location=location1+"/"+filename
 					path_location=location.replace("/", "\\\\");
@@ -3599,7 +3611,7 @@ def save_committee_resolution():
 
 				file=request.files[filename_array]
 
-				n_path = Path(__file__).parent / "../static/uploads/upload_committee_resolution_files" / str(p['resolution_id_main'])
+				n_path = Path(__file__).parent / "../static/uploads/upload_committee_resolution_files" / str(int(p['resolution_id_main']))
 				n_path.resolve()
 				
 				if file and allowed_file(file.filename):
@@ -3612,7 +3624,7 @@ def save_committee_resolution():
 						app.config['UPLOAD_FOLDER']=n_path
 						file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
 
-					location1="upload_committee_resolution_files//"+str(p['resolution_id_main'])
+					location1="upload_committee_resolution_files//"+str(int(p['resolution_id_main']))
 					location1.replace("//", "\\\\");
 					location=location1+"/"+filename
 					path_location=location.replace("/", "\\\\");
@@ -3714,7 +3726,7 @@ def save_committee_ordinance():
 
 				file=request.files[filename_array]
 
-				n_path = Path(__file__).parent / "../static/uploads/upload_committee_ordinance_files" / str(p['ordinance_id_main'])
+				n_path = Path(__file__).parent / "../static/uploads/upload_committee_ordinance_files" / str(int(p['ordinance_id_main']))
 				n_path.resolve()
 				
 				if file and allowed_file(file.filename):
@@ -3727,7 +3739,7 @@ def save_committee_ordinance():
 						app.config['UPLOAD_FOLDER']=n_path
 						file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
 
-					location1="upload_committee_ordinance_files//"+str(p['ordinance_id_main'])
+					location1="upload_committee_ordinance_files//"+str(int(p['ordinance_id_main']))
 					location1.replace("//", "\\\\");
 					location=location1+"/"+filename
 					path_location=location.replace("/", "\\\\");
@@ -3804,7 +3816,7 @@ def save_committee_ordinance():
 				file_name="file_attach["+str(x)+"]"
 				file=request.files[filename_array]
 
-				n_path = Path(__file__).parent / "../static/uploads/upload_committee_ordinance_files" / str(p['ordinance_id_main'])
+				n_path = Path(__file__).parent / "../static/uploads/upload_committee_ordinance_files" / str(int(p['ordinance_id_main']))
 				n_path.resolve()
 				
 				if file and allowed_file(file.filename):
@@ -3817,7 +3829,7 @@ def save_committee_ordinance():
 						app.config['UPLOAD_FOLDER']=n_path
 						file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
 
-					location1="upload_committee_ordinance_files//"+str(p['ordinance_id_main'])
+					location1="upload_committee_ordinance_files//"+str(int(p['ordinance_id_main']))
 					location1.replace("//", "\\\\");
 					location=location1+"/"+filename
 					path_location=location.replace("/", "\\\\");
@@ -3902,7 +3914,7 @@ def save_committee_petition():
 
 				file=request.files[filename_array]
 
-				n_path = Path(__file__).parent / "../static/uploads/upload_committee_petition_files" / str(p['petition_id_main'])
+				n_path = Path(__file__).parent / "../static/uploads/upload_committee_petition_files" / str(int(p['petition_id_main']))
 				n_path.resolve()
 				
 				if file and allowed_file(file.filename):
@@ -3915,7 +3927,7 @@ def save_committee_petition():
 						app.config['UPLOAD_FOLDER']=n_path
 						file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
 
-					location1="upload_committee_petition_files//"+str(p['petition_id_main'])
+					location1="upload_committee_petition_files//"+str(int(p['petition_id_main']))
 					location1.replace("//", "\\\\");
 					location=location1+"/"+filename
 					path_location=location.replace("/", "\\\\");
@@ -3934,7 +3946,7 @@ def save_committee_petition():
 
 				file=request.files[filename_array]
 
-				n_path = Path(__file__).parent / "../static/uploads/upload_committee_petition_minutes_files" / str(p['petition_id_main'])
+				n_path = Path(__file__).parent / "../static/uploads/upload_committee_petition_minutes_files" / str(int(p['petition_id_main']))
 				n_path.resolve()
 				
 				if file and allowed_file(file.filename):
@@ -3947,7 +3959,7 @@ def save_committee_petition():
 						app.config['UPLOAD_FOLDER']=n_path
 						file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
 
-					location1="upload_committee_petition_minutes_files//"+str(p['petition_id_main'])
+					location1="upload_committee_petition_minutes_files//"+str(int(p['petition_id_main']))
 					location1.replace("//", "\\\\");
 					location=location1+"/"+filename
 					path_location=location.replace("/", "\\\\");
@@ -3993,7 +4005,7 @@ def save_committee_petition():
 				file_name="file_attach["+str(x)+"]"
 				file=request.files[filename_array]
 
-				n_path = Path(__file__).parent / "../static/uploads/upload_committee_petition_files" / str(p['petition_id_main'])
+				n_path = Path(__file__).parent / "../static/uploads/upload_committee_petition_files" / str(int(p['petition_id_main']))
 				n_path.resolve()
 				
 				if file and allowed_file(file.filename):
@@ -4006,7 +4018,7 @@ def save_committee_petition():
 						app.config['UPLOAD_FOLDER']=n_path
 						file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
 
-					location1="upload_committee_petition_files//"+str(p['petition_id_main'])
+					location1="upload_committee_petition_files//"+str(int(p['petition_id_main']))
 					location1.replace("//", "\\\\");
 					location=location1+"/"+filename
 					path_location=location.replace("/", "\\\\");
@@ -4024,7 +4036,7 @@ def save_committee_petition():
 				file_name="file_minutes["+str(y)+"]"
 				file=request.files[filename_array]
 
-				n_path = Path(__file__).parent / "../static/uploads/upload_committee_petition_minutes_files" / str(p['petition_id_main'])
+				n_path = Path(__file__).parent / "../static/uploads/upload_committee_petition_minutes_files" / str(int(p['petition_id_main']))
 				n_path.resolve()
 				
 				if file and allowed_file(file.filename):
@@ -4037,7 +4049,7 @@ def save_committee_petition():
 						app.config['UPLOAD_FOLDER']=n_path
 						file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
 
-					location1="upload_committee_ordinance_minutes_files//"+str(p['petition_id_main'])
+					location1="upload_committee_ordinance_minutes_files//"+str(int(p['petition_id_main']))
 					location1.replace("//", "\\\\");
 					location=location1+"/"+filename
 					path_location=location.replace("/", "\\\\");
@@ -4345,7 +4357,7 @@ def save_documents_refferals():
 		for filename_array in request.files:
 			file=request.files[filename_array]
 
-			n_path = Path(__file__).parent / "../static/uploads/upload_document_referals" / str(p['document_referal_id'])
+			n_path = Path(__file__).parent / "../static/uploads/upload_document_referals" / str(int(p['document_referal_id']))
 			n_path.resolve()
 
 			if file and allowed_file(file.filename):
@@ -4358,7 +4370,7 @@ def save_documents_refferals():
 					app.config['UPLOAD_FOLDER']=n_path
 					file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
 					
-				location1="upload_document_referals//"+str(p['document_referal_id'])
+				location1="upload_document_referals//"+str(int(p['document_referal_id']))
 				location1.replace("//", "\\\\");
 				location=location1+"/"+filename
 				path_location=location.replace("/", "\\\\");
@@ -4411,7 +4423,7 @@ def save_barangay_ordinance():
 		for filename_array in request.files:
 			file=request.files[filename_array]
 
-			n_path = Path(__file__).parent / "../static/uploads/upload_barangay_ordinance" / str(p['barangay_ordinance_id'])
+			n_path = Path(__file__).parent / "../static/uploads/upload_barangay_ordinance" / str(int(p['barangay_ordinance_id']))
 			n_path.resolve()
 
 			if file and allowed_file(file.filename):
@@ -4424,7 +4436,7 @@ def save_barangay_ordinance():
 					app.config['UPLOAD_FOLDER']=n_path
 					file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
 					
-				location1="upload_barangay_ordinance//"+str(p['barangay_ordinance_id'])
+				location1="upload_barangay_ordinance//"+str(int(p['barangay_ordinance_id']))
 				location1.replace("//", "\\\\");
 				location=location1+"/"+filename
 				path_location=location.replace("/", "\\\\");
@@ -4478,7 +4490,7 @@ def save_barangay_resolution():
 		for filename_array in request.files:
 			file=request.files[filename_array]
 
-			n_path = Path(__file__).parent / "../static/uploads/upload_barangay_resolution" / str(p['barangay_resolution_id'])
+			n_path = Path(__file__).parent / "../static/uploads/upload_barangay_resolution" / str(int(p['barangay_resolution_id']))
 			n_path.resolve()
 
 			if file and allowed_file(file.filename):
@@ -4491,7 +4503,7 @@ def save_barangay_resolution():
 					app.config['UPLOAD_FOLDER']=n_path
 					file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
 					
-				location1="upload_barangay_resolution//"+str(p['barangay_resolution_id'])
+				location1="upload_barangay_resolution//"+str(int(p['barangay_resolution_id']))
 				location1.replace("//", "\\\\");
 				location=location1+"/"+filename
 				path_location=location.replace("/", "\\\\");
@@ -4545,7 +4557,7 @@ def save_executive_order():
 		for filename_array in request.files:
 			file=request.files[filename_array]
 
-			n_path = Path(__file__).parent / "../static/uploads/upload_executive_order" / str(p['executive_order_id'])
+			n_path = Path(__file__).parent / "../static/uploads/upload_executive_order" / str(int(p['executive_order_id']))
 			n_path.resolve()
 
 			if file and allowed_file(file.filename):
@@ -4558,7 +4570,7 @@ def save_executive_order():
 					app.config['UPLOAD_FOLDER']=n_path
 					file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
 					
-				location1="upload_executive_order//"+str(p['executive_order_id'])
+				location1="upload_executive_order//"+str(int(p['executive_order_id']))
 				location1.replace("//", "\\\\");
 				location=location1+"/"+filename
 				path_location=location.replace("/", "\\\\");
@@ -4610,7 +4622,7 @@ def save_memorandom():
 		for filename_array in request.files:
 			file=request.files[filename_array]
 
-			n_path = Path(__file__).parent / "../static/uploads/upload_memorandom" / str(p['memorandom_id'])
+			n_path = Path(__file__).parent / "../static/uploads/upload_memorandom" / str(int(p['memorandom_id']))
 			n_path.resolve()
 
 			if file and allowed_file(file.filename):
@@ -4623,7 +4635,7 @@ def save_memorandom():
 					app.config['UPLOAD_FOLDER']=n_path
 					file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
 					
-				location1="upload_memorandom//"+str(p['memorandom_id'])
+				location1="upload_memorandom//"+str(int(p['memorandom_id']))
 				location1.replace("//", "\\\\");
 				location=location1+"/"+filename
 				path_location=location.replace("/", "\\\\");
@@ -4770,7 +4782,7 @@ def del_ordinance():
 	delete="""delete from tbl_ordinance where ordinance_id=%s"""
 	delete_params = [str(p['ordinance_id'])]
 	cud_safe(delete, delete_params)
-	n_path = Path(__file__).parent / "../static/uploads/upload_ordinance_files" / str(p['ordinance_id'])
+	n_path = Path(__file__).parent / "../static/uploads/upload_ordinance_files" / str(int(p['ordinance_id']))
 	n_path.resolve()
 	if Path.exists(n_path):
 		shutil.rmtree(n_path)
@@ -4794,7 +4806,7 @@ def del_resolution():
 	delete="""delete from tbl_resolution where resolution_id=%s"""
 	delete_params = [str(p['resolution_id'])]
 	cud_safe(delete, delete_params)
-	n_path = Path(__file__).parent / "../static/uploads/upload_files_resolution" / str(p['resolution_id'])
+	n_path = Path(__file__).parent / "../static/uploads/upload_files_resolution" / str(int(p['resolution_id']))
 	n_path.resolve()
 	if Path.exists(n_path):
 		shutil.rmtree(n_path)
@@ -4809,7 +4821,7 @@ def delete_resolution_minutes_file():
 	delete_params = [str(p['minutes_res_id'])]
 	
 	cud_safe(delete, delete_params)
-	n_path = Path(__file__).parent / "../static/uploads/upload_files_resolution_minutes" / str(p['minutes_id'])
+	n_path = Path(__file__).parent / "../static/uploads/upload_files_resolution_minutes" / str(int(p['minutes_id']))
 	n_path.resolve()
 	if Path.exists(n_path):
 		shutil.rmtree(n_path)
@@ -5109,7 +5121,7 @@ def save_resolution():
 
 				file=request.files[filename_array]
 
-				n_path = Path(__file__).parent / "../static/uploads/upload_files_resolution" / str(p['resolution_id'])
+				n_path = Path(__file__).parent / "../static/uploads/upload_files_resolution" / str(int(p['resolution_id']))
 				n_path.resolve()
 				
 				if file and allowed_file(file.filename):
@@ -5122,7 +5134,7 @@ def save_resolution():
 						app.config['UPLOAD_FOLDER']=n_path
 						file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
 
-					location1="upload_files_resolution//"+str(p['resolution_id'])
+					location1="upload_files_resolution//"+str(int(p['resolution_id']))
 					location1.replace("//", "\\\\");
 					location=location1+"/"+filename
 					path_location=location.replace("/", "\\\\");
@@ -5138,7 +5150,7 @@ def save_resolution():
 				file_name_min="file_minutes["+str(y)+"]"
 
 				file=request.files[file_name_min]
-				n_path = Path(__file__).parent / "../static/uploads/upload_files_resolution_minutes" / str(p['resolution_id'])
+				n_path = Path(__file__).parent / "../static/uploads/upload_files_resolution_minutes" / str(int(p['resolution_id']))
 				n_path.resolve()
 				
 				if file and allowed_file(file.filename):
@@ -5151,7 +5163,7 @@ def save_resolution():
 						app.config['UPLOAD_FOLDER']=n_path
 						file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
 
-					location1="upload_files_resolution_minutes//"+str(p['resolution_id'])
+					location1="upload_files_resolution_minutes//"+str(int(p['resolution_id']))
 					location1.replace("//", "\\\\");
 					location=location1+"/"+filename
 					path_location=location.replace("/", "\\\\");
@@ -5165,7 +5177,7 @@ def save_resolution():
 				file_name_min="file_veto["+str(z)+"]"
 
 				file=request.files[file_name_min]
-				n_path = Path(__file__).parent / "../static/uploads/upload_veto_resolution" / str(p['resolution_id'])
+				n_path = Path(__file__).parent / "../static/uploads/upload_veto_resolution" / str(int(p['resolution_id']))
 				n_path.resolve()
 				
 				if file and allowed_file(file.filename):
@@ -5178,7 +5190,7 @@ def save_resolution():
 						app.config['UPLOAD_FOLDER']=n_path
 						file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
 
-					location1="upload_veto_resolution//"+str(p['resolution_id'])
+					location1="upload_veto_resolution//"+str(int(p['resolution_id']))
 					location1.replace("//", "\\\\");
 					location=location1+"/"+filename
 					path_location=location.replace("/", "\\\\");
@@ -5229,36 +5241,39 @@ def save_resolution():
 
 
 @query.route('/save_new_password', methods=['GET', 'POST'])
-@login_required
+@user_admin_required
 def save_new_password():
 	p=json.loads(request.data)
 	if p['h_user']=="0" or p['h_user']==0:
 		if str(p['new_pass'])==str(p['confirm_pass']):
 			insert="""insert into tbl_login set username=%s,password=%s,fullname=%s,type=1"""
-			insert_params = [str(p['new_username']), str(p['confirm_pass']), str(p['fullname'])]
+			insert_params = [str(p['new_username']), hash_password(p['confirm_pass']), str(p['fullname'])]
 			cud_safe(insert, insert_params)
 			return jsonify("Succesfuly Saved")
 		else:
 			return jsonify("Password did not match")
 	else:
-		sel="""select * from tbl_login where password=%s"""
-		sel_params = [str(p['old_pass'])]
-		rd=pyread_safe(sel, sel_params)
-		if rd:
-			if str(rd[0]['username'])!="":
-				if str(p['new_pass'])==str(p['confirm_pass']):
-					update="""update tbl_login set username=%s, password=%s, fullname=%s where login_id=%s"""
-					update_params = [str(p['new_username']), str(p['confirm_pass']), str(p['fullname']), str(p['h_user'])]
-					cud_safe(update, update_params)
-					return jsonify("Succesfuly Updated")
-				else:
-					return jsonify("Password did not match")
-		else:
+		rd=pyread_safe("""select * from tbl_login where login_id=%s""", [str(p['h_user'])])
+		if not rd:
+			return jsonify("User not found")
+		# admins reset passwords without the old one; others must prove they know it
+		if session.get('sessioned_role') != "2" and not verify_password(rd[0]['password'], p.get('old_pass', '')):
 			return jsonify("Password is incorrect")
+		if str(p['new_pass'])!=str(p['confirm_pass']):
+			return jsonify("Password did not match")
+		if str(p['new_pass'])=="":
+			# blank new password = only rename; keep the current password
+			update="""update tbl_login set username=%s, fullname=%s where login_id=%s"""
+			update_params = [str(p['new_username']), str(p['fullname']), str(p['h_user'])]
+		else:
+			update="""update tbl_login set username=%s, password=%s, fullname=%s where login_id=%s"""
+			update_params = [str(p['new_username']), hash_password(p['new_pass']), str(p['fullname']), str(p['h_user'])]
+		cud_safe(update, update_params)
+		return jsonify("Succesfuly Updated")
 
 
 @query.route('/delete_user', methods = ['POST','GET'])
-@login_required
+@user_admin_required
 def delete_user():
 	try:
 		p  = json.loads(request.data)
@@ -5565,7 +5580,7 @@ def delete_veto_ordinance_file():
 	delete="""delete from tbl_veto_ordinance where veto_ordinance_id=%s"""
 	delete_params = [str(p['veto_ordinance_id'])]
 	cud_safe(delete, delete_params)
-	n_path = Path(__file__).parent / "../static/uploads/upload_veto_ordinance" / str(p['ordinance_id'])
+	n_path = Path(__file__).parent / "../static/uploads/upload_veto_ordinance" / str(int(p['ordinance_id']))
 	n_path.resolve()
 	if Path.exists(n_path):
 		shutil.rmtree(n_path)
@@ -5579,7 +5594,7 @@ def delete_veto_resolution_file():
 	delete="""delete from tbl_veto_resolution where veto_resolution_id=%s"""
 	delete_params = [str(p['veto_resolution_id'])]
 	cud_safe(delete, delete_params)
-	n_path = Path(__file__).parent / "../static/uploads/upload_veto_resolution" / str(p['resolution_id'])
+	n_path = Path(__file__).parent / "../static/uploads/upload_veto_resolution" / str(int(p['resolution_id']))
 	n_path.resolve()
 	if Path.exists(n_path):
 		shutil.rmtree(n_path)
@@ -6588,6 +6603,8 @@ def get_login():
 			GROUP BY tl.login_id;
 		"""
 		rd=pyread(sel)
+		for r in rd:
+			r.pop('password', None)  # never send passwords/hashes to the browser
 		return jsonify(rd)
 	except Exception as e:
 		return e
@@ -6769,6 +6786,7 @@ def get_com_report():
 		prnt_R(e)
 		return e
 
+# shortcut: stays public because the landing page lets visitors email documents; anyone can still send arbitrary text from the system Gmail
 @query.route('/send_emails', methods=['POST','GET'])
 def send_emails():
 	p=json.loads(request.data)
@@ -6779,10 +6797,17 @@ def send_emails():
 
 		try:
 			res = []
+			uploads = (Path("application") / "static" / "uploads").resolve()
 			for val in p['file_path']:
 				if val != None :
-					f = "application\\static\\" + str(val)
-					res.append(f)
+					# DB paths are relative to static/uploads (e.g. upload_ordinance_files\459\x.pdf)
+					f = (uploads / str(val)).resolve()
+					if not f.exists():
+						f = (uploads.parent / str(val)).resolve()
+					# only attach files under static/uploads, never source/config files
+					if uploads not in f.parents:
+						return jsonify({"message":"Invalid attachment path", "status": 400})
+					res.append(str(f))
 			files = res
 		except KeyError:
 			files=[]
@@ -8751,12 +8776,12 @@ def send_image():
 	cwd = os.getcwd()
 	file=request.files['file']
 	scan_image=file
-	os.chdir('application')
-	os.chdir('static')
 	if file.filename == '':
 		prnt_Y('No file selected for uploading')
 		return jsonify("Please select proper image")
 	else:
+		os.chdir('application')
+		os.chdir('static')
 		location="bg_image//image//"
 		location.replace("//", "\\\\");
 		if not os.path.exists(location):
@@ -9107,7 +9132,7 @@ def save_album_images():
 	for filename_array in request.files:
 		file=request.files[filename_array]
 
-		n_path = Path(__file__).parent / "../static/uploads/upload_albums" / str(p['gallery_id'])
+		n_path = Path(__file__).parent / "../static/uploads/upload_albums" / str(int(p['gallery_id']))
 		n_path.resolve()
 
 		if file and allowed_file(file.filename):
@@ -9120,7 +9145,7 @@ def save_album_images():
 				app.config['UPLOAD_FOLDER']=n_path
 				file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
 				
-			location1="upload_albums//"+str(p['gallery_id'])
+			location1="upload_albums//"+str(int(p['gallery_id']))
 			location1.replace("//", "\\\\");
 			location=location1+"/"+filename
 			path_location=location.replace("/", "\\\\");
@@ -9408,7 +9433,7 @@ def count_documents():
 
 
 @query.route('/save_role', methods=['GET', 'POST'])
-@login_required
+@user_admin_required
 def save_role():
 	p=json.loads(request.data)
 
@@ -9546,7 +9571,7 @@ def pre_register():
 	cud_safe(insert_gmail, insert_gmail_params)
 
 	insert_login="""insert into tbl_login set username=%s, password=%s, role='2', fullname=%s"""
-	insert_login_params = [str(p['username']), str(p['password']), str(p['fullname'])]
+	insert_login_params = [str(p['username']), hash_password(p['password']), str(p['fullname'])]
 	cud_safe(insert_login, insert_login_params)
 
 	insert_config="""insert into tbl_config_info set city_name=%s, type=1"""
@@ -9962,7 +9987,7 @@ def save_committee_minutes():
 			os.chdir('application')
 			os.chdir('static')
 			loc = "upload_committee_minutes"
-			location=""+str(loc)+"//"+str(p['h_committee_minutes_id'])
+			location=""+str(loc)+"//"+str(int(p['h_committee_minutes_id']))
 			location.replace("//", "\\\\");
 			if file and allowed_file(file.filename):
 				filename = str(custom_secure_filename(file.filename))
@@ -10189,13 +10214,14 @@ def delete_session():
 
 
 @query.route('/save_propose', methods = ['POST','GET'])
+@login_required
 def save_propose():
 	p=json.loads(request.data)
 	select  = """select action_taken from tbl_document_tracking where track_gen_id=%s """
 	select_params = [str(p['track_gen_id'])]
 	rd = pyread_safe(select, select_params)
 
-	if rd[0]['action_taken']=="1":
+	if rd and rd[0]['action_taken']=="1":
 		update = """
 			update tbl_document_tracking set action_taken = 2, doc_status='' where track_gen_id=%s
 		"""
@@ -10389,14 +10415,12 @@ def update_proposed():
 
 
 @query.route('/approve_document', methods = ['POST','GET'])
+@login_required
 def approve_document():
 	p=json.loads(request.data)
-	if p['status']=="1":
-		n = "1st"
-	elif p['status']=="2":
-		n = "2nd"
-	elif p['status']=="3":
-		n = "3rd"
+	n = READINGS.get(str(p['status']))
+	if not n:
+		return jsonify("Invalid status"), 400
 	stat = "Approved as " + n + " reading"
 	upd = """
 		update tbl_document_tracking set action_taken=%s where track_gen_id=%s
@@ -10418,12 +10442,9 @@ def approve_document():
 @login_required
 def cancel_document():
 	p=json.loads(request.data)
-	if p['status']=="1":
-		n = "1st"
-	elif p['status']=="2":
-		n = "2nd"
-	elif p['status']=="3":
-		n = "3rd"
+	n = READINGS.get(str(p['status']))
+	if not n:
+		return jsonify("Invalid status"), 400
 
 	stat = "Approved as " + n + " reading"
 

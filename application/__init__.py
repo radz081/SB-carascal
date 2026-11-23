@@ -7,7 +7,8 @@ socketio = SocketIO()
 def create_app(debug=True):
     """Create an application."""
     app = Flask(__name__)
-    app.config['SECRET_KEY'] = '&^##*($top_secret&&#(@(@":f'
+    # no key in .env -> random per start (sessions reset on restart) instead of a forgeable known key
+    app.config['SECRET_KEY'] = os.environ.get('FLASK_SECRET_KEY') or os.urandom(32)
     app.debug = debug
     IMAGE_FOLDER = os.path.join('static', 'image')
 

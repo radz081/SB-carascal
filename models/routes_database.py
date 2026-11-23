@@ -56,11 +56,11 @@ def prnt_G(msg):
 # password = "password"
 
 
-host = "localhost"
-user = "root"
-
-password = "lgubislig"
-database1 = "sangunian_db"
+# shortcut: falls back to the old hard-coded values so existing installs keep working; drop the fallbacks once every server has a .env
+host = os.environ.get("DB_HOST", "localhost")
+user = os.environ.get("DB_USER", "root")
+password = os.environ.get("DB_PASSWORD", "lgubislig")
+database1 = os.environ.get("DB_NAME", "sangunian_db")
 # password = "bislig"
 # database1 = "sangs"
 
@@ -90,6 +90,22 @@ def cud(sql):
 	except Exception as e:
 		print(style.RED("MYSQL error in loading: '"+str(e)+"' '"+str(sql)+"'") + style.RESET(""))
 		return "400"
+
+from werkzeug.security import generate_password_hash, check_password_hash
+
+def hash_password(plain):
+	return generate_password_hash(str(plain))
+
+def is_password_hashed(stored):
+	return str(stored or '').startswith(('pbkdf2:', 'scrypt:'))
+
+def verify_password(stored, given):
+	"""True if `given` matches `stored`, which may be a werkzeug hash or a legacy plaintext password."""
+	stored = str(stored or '')
+	if is_password_hashed(stored):
+		return check_password_hash(stored, str(given))
+	# shortcut: legacy plaintext accepted until every row is hashed; drop this branch once none are left
+	return stored != '' and stored == str(given)
 
 # SAFE version with parameterized queries
 def cud_safe(sql, params=None):
@@ -251,7 +267,6 @@ class EmailSender():
     def send_email(self, to):
     	self.msg['From'] = self.sender_from
     	self.msg['To'] = self.email_to
-    	self.msg['pass'] = self.sender_pass
     	s = smtplib.SMTP("smtp.gmail.com", 587)
     	s.set_debuglevel(1)
     	s.verify(self.sender_from)

@@ -64,7 +64,25 @@
 		})
 
 		load_login()
+
+		$('#form_user [onclick="toggle_pass(this)"]').html(EYE_ICON)
+		// put fields back to hidden whenever the form is reset (modal reopened)
+		getbyId('form_user').addEventListener('reset', function(){
+			$('#form_user [onclick="toggle_pass(this)"]').each(function(){ toggle_pass(this, false) })
+		})
 	})
+
+	var EYE_ICON = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>'
+	var EYE_OFF_ICON = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/><line x1="2" y1="2" x2="22" y2="22"/></svg>'
+
+	function toggle_pass(btn, show){
+		var inp = btn.previousElementSibling
+		if (show === undefined) show = inp.type === 'password'
+		inp.type = show ? 'text' : 'password'
+		btn.innerHTML = show ? EYE_OFF_ICON : EYE_ICON
+		btn.title = show ? 'Hide password' : 'Show password'
+		btn.setAttribute('aria-label', btn.title)
+	}
 
 	function load_login(){
         if ($.fn.DataTable.isDataTable("#tbl_login")) {
@@ -129,7 +147,10 @@
         var dataArr = $('#tbl_login').DataTable().row(tr).data();
 
         if(dataArr){
-	     	getbyId('user_create_or_not').style.display="block"
+	     	// admins reset passwords without the old one (server enforces the same rule)
+	     	var is_admin = {{ 'true' if session.get('sessioned_role') == '2' else 'false' }};
+	     	getbyId('user_create_or_not').style.display = is_admin ? "none" : "block"
+	     	getbyId('inp_old_pass').required = !is_admin
      		var form=getbyId('form_user')
      		form.fullname.value=dataArr.fullname
      		form.new_username.value = dataArr.username
